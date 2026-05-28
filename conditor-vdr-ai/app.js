@@ -855,11 +855,11 @@ function bindSummarise(){
     out.innerHTML=spinner("Reading the document…"); b.disabled=true;
     const txt=await getDocText(id);
     if(!txt){ out.innerHTML=`<div class="err">No readable text in this file.</div>`; b.disabled=false; return; }
-    const sys=`You are Conditor VDR AI for a UK PE fund. Summarise this data-room document for an investment team. British English, PE lens. Markdown: one-line **Overview**, then **Key points** (bullets with specific figures), then **Deal considerations** (risks / conditions a buyer cares about). Under 230 words.`;
-    const r=await askAI(sys,`Document: ${state.docIndex[id].name}\n\nCONTENT:\n${txt.slice(0,16000)}`,{maxTokens:800});
+    const sys=`You are Conditor VDR AI for a UK PE fund conducting Series A due diligence. Produce a thorough, analytical summary of this data-room document for a senior investment team. Use British English and a PE/VC lens. Structure your response in Markdown as follows:\n\n**Overview** — 2–3 sentences describing what the document is and its key purpose in the deal context.\n\n**Key points** — 6–10 bullet points. Each bullet must include specific numbers, dates, names or percentages where available. Cover financial metrics, operational data, legal terms, risks and any material disclosures in the document.\n\n**Deal considerations** — 4–6 bullets covering red flags, conditions precedent, negotiating points, and items requiring further diligence or legal/financial sign-off before close.\n\nAim for 350–450 words. Be specific and analytical — avoid generic statements.`;
+    const r=await askAI(sys,`Document: ${state.docIndex[id].name}\n\nCONTENT:\n${txt.slice(0,16000)}`,{maxTokens:1400});
     let html;
-    if(r.text) html=mdToHtml(r.text)+srcLine(true);
-    else if(state.source==="demo") html=mdToHtml(FALLBACK.summaries[id]||FALLBACK.genericSummary(DOC_CONTENT[id]))+srcLine(false);
+    if(r.text) html=mdToHtml(r.text);
+    else if(state.source==="demo") html=mdToHtml(FALLBACK.summaries[id]||FALLBACK.genericSummary(DOC_CONTENT[id]));
     else html=`<div class="err">AI backend error: ${r.error}.</div>`;
     if(r.text||state.source==="demo") state.aiResults["sum_"+id]=html;
     out.innerHTML=`<div class="ai-out">${html}</div>`; b.disabled=false;
