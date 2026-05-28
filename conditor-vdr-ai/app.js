@@ -8,8 +8,10 @@
 
 const CONFIG = {
   // Paste your Google OAuth Client ID here (or set window.CONDITOR_CLIENT_ID before this script).
-  // Leave blank to run in demo mode.
   GOOGLE_CLIENT_ID: (typeof window !== "undefined" && window.CONDITOR_CLIENT_ID) || "233514743688-mmdflh9g85mnbsf7ebc3j0ptc67c4ukk.apps.googleusercontent.com",
+  // Paste your Gemini API key here for direct browser-side AI (free at aistudio.google.com).
+  // Used as fallback when the /api/ai backend is unavailable (e.g. running with node server.js).
+  GEMINI_API_KEY: (typeof window !== "undefined" && window.CONDITOR_GEMINI_KEY) || "AIzaSyBsLWRNh4hMgWRkGnNhR1qyFLOCRMWrJlo",
   DRIVE_SCOPE: "https://www.googleapis.com/auth/drive.readonly",
   AI_ENDPOINT: "/api/ai",
   AI_PROVIDER_LABEL: "Gemini",
@@ -241,6 +243,36 @@ async function askAI(system, prompt, {maxTokens=1300, timeoutMs=30000}={}){
     clearTimeout(t);
     return { error: e.name==="AbortError" ? "AI request timed out" : "Backend unreachable" };
   }
+}
+
+// Direct Gemini call (browser-side fallback when backend is unavailable)
+async function askGeminDirect(system, prompt, {maxTokens=800}={}){
+  if(!CONFIG.GEMINI_API_KEY) return { error: "No API key" };
+  try{
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`,
+      { method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          system_instruction:{ parts:[{text: system}] },
+          contents:[{ role:"user", parts:[{text: prompt}] }],
+          generationConfig:{ maxOutputTokens: maxTokens }
+        })
+      }
+    );
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) return { error: data.error?.message || "Gemini error "+res.status };
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if(!text) return { error: "Empty response" };
+    return { text, live: true };
+  }catch(e){ return { error: e.message }; }
+}
+
+// Wrapper: tries backend first, falls back to direct Gemini, then returns error
+async function askAIWithFallback(system, prompt, opts={}){
+  const r = await askAI(system, prompt, opts);
+  if(r.text) return r;
+  if(CONFIG.GEMINI_API_KEY) return await askGeminDirect(system, prompt, opts);
+  return r;
 }
 
 // ============================================================
@@ -588,7 +620,7 @@ B) Asking a general question, greeting, or discussing PE/deals → reply with ju
 Always reply in this format:
 ANSWER: <your response in British English — conversational for chat, precise for navigation>
 DOC: <[id] of the best matching document, or NONE if not applicable>`;
-  const r=await askAI(sys,`USER: ${q}`,{maxTokens:400});
+  const r=await askAIWithFallback(sys,`USER: ${q}`,{maxTokens:400});
   let answer,jumpTo=null;
   if(r.text){ const m=r.text.match(/ANSWER:\s*([\s\S]*?)\s*(?:DOC:\s*(\S+))?$/i);
     if(m){ answer=m[1].trim(); const rawId=(m[2]||"").replace(/[\[\]]/g,""); if(rawId&&rawId!=="NONE"&&state.docIndex[rawId]&&state.docIndex[rawId].type==="doc") jumpTo=rawId; } else answer=r.text.trim(); }
