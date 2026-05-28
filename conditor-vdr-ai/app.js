@@ -33,6 +33,7 @@ const state = {
   drive: { token: null, connected: false, ready: false, email: null },
   contentCache: {},          // id -> text content
   showConnect: false,
+  showComingSoon: false,
   liveFlags: null,
   selectedTemplate: "tpl_pnl_india",
   customTemplates: [],
@@ -351,8 +352,8 @@ function toast(msg){
 // RENDER SHELL
 // ============================================================
 function render(){
-  app.innerHTML = `${topbar()}<div class="body">${sidePanel()}<div class="work">${tabBar()}<div class="canvas"><div class="view" id="view"></div></div></div></div>${state.showConnect?connectModal():""}${state.showUploadModal?uploadModal():""}`;
-  renderView(); bindSide(); bindModal(); bindUploadModal();
+  app.innerHTML = `${topbar()}<div class="body">${sidePanel()}<div class="work">${tabBar()}<div class="canvas"><div class="view" id="view"></div></div></div></div>${state.showConnect?connectModal():""}${state.showUploadModal?uploadModal():""}${state.showComingSoon?comingSoonModal():""}`;
+  renderView(); bindSide(); bindModal(); bindUploadModal(); bindComingSoonModal();
 }
 
 function topbar(){
@@ -368,9 +369,10 @@ function topbar(){
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="11" x2="8" y2="7.5"/><circle cx="8" cy="5.5" r=".5" fill="currentColor" stroke="none"/></svg>
         Tour
       </button>
-      <button class="connect ${linked?'linked':''}" onclick="connectDrive()">
+      <button class="connect ${linked?'linked':''}" onclick="${linked?'connectDrive()':'showComingSoon()'}">
         ${linked?I.drive:I.drive}
         <span>${linked?'Drive connected':'Connect Google Drive'}</span>
+        ${!linked?`<span class="coming-soon-badge">Coming soon</span>`:''}
       </button>
     </div>
   </div>`;
@@ -519,6 +521,31 @@ function connectModal(){
 }
 function bindModal(){ const bg=document.getElementById("modalBg"); if(bg) bg.onclick=e=>{ if(e.target===bg) closeModal(); }; }
 function closeModal(){ state.showConnect=false; render(); }
+
+function showComingSoon(){ state.showComingSoon=true; render(); }
+function closeComingSoon(){ state.showComingSoon=false; render(); }
+function comingSoonModal(){
+  return `<div class="modal-bg" id="comingSoonBg"><div class="modal" style="max-width:460px">
+    <div class="modal-h" style="background:linear-gradient(160deg,var(--g600) 0%,var(--g800) 100%)">
+      <h3>${I.drive} Google Drive Integration<span class="x" onclick="closeComingSoon()">×</span></h3>
+      <p>Live data room access via Google Drive</p>
+    </div>
+    <div class="modal-b">
+      <div style="text-align:center;padding:8px 0 18px">
+        <div style="width:56px;height:56px;margin:0 auto 16px;background:linear-gradient(135deg,rgba(194,161,77,.15),rgba(194,161,77,.05));border:1.5px solid rgba(194,161,77,.3);border-radius:14px;display:grid;place-items:center">${I.drive}</div>
+        <h3 style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:8px">Pending Google Cloud Verification</h3>
+        <p style="font-size:13.5px;color:var(--muted);line-height:1.65;max-width:340px;margin:0 auto">
+          Live Google Drive access is currently awaiting Google Cloud app verification. Once approved, you'll be able to connect any Drive folder and run all AI workflows directly on your own deal data.
+        </p>
+      </div>
+      <div class="note" style="margin-top:4px">${I.info}<div>Everything works right now with the built-in demo data room — all six AI workflows are fully functional and available to explore.</div></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn gold" onclick="closeComingSoon()">Explore demo instead</button>
+    </div>
+  </div></div>`;
+}
+function bindComingSoonModal(){ const bg=document.getElementById("comingSoonBg"); if(bg) bg.onclick=e=>{ if(e.target===bg) closeComingSoon(); }; }
 
 // ============================================================
 // UPLOAD TEMPLATE MODAL
@@ -1206,7 +1233,7 @@ function navFallback(q){
 // ============================================================
 function bootDemo(){
   state.source="demo"; state.search=""; state.selectedDoc=null; state.aiResults={}; state.contentCache={}; state.liveFlags=null; state.chat=[];
-  state.selectedTemplate="tpl_pnl_india"; state.customTemplates=[]; state.showUploadModal=false; state.uploadPreview=null;
+  state.selectedTemplate="tpl_pnl_india"; state.customTemplates=[]; state.showUploadModal=false; state.uploadPreview=null; state.showComingSoon=false;
   state.expanded={root:true,f1:true,f2:false,f2a:false,f2b:false,f3:false,f3a:false,f3b:false,f3b1:false,f3b2:false,f3c:false,f3c1:false,f3c2:false,f4:true,f4a:false,f4b:false,f4c:false,f4c1:false,f4c2:false,f4d:false,f5:false,f5a:false,f5b:false,f6:false};
   buildIndex(JSON.parse(JSON.stringify(TREE)));
   state.tab="overview"; render();
