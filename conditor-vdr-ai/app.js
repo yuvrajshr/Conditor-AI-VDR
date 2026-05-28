@@ -9,7 +9,7 @@
 const CONFIG = {
   // Paste your Google OAuth Client ID here (or set window.CONDITOR_CLIENT_ID before this script).
   // Leave blank to run in demo mode.
-  GOOGLE_CLIENT_ID: (typeof window !== "undefined" && window.CONDITOR_CLIENT_ID) || "",
+  GOOGLE_CLIENT_ID: (typeof window !== "undefined" && window.CONDITOR_CLIENT_ID) || "233514743688-mmdflh9g85mnbsf7ebc3j0ptc67c4ukk.apps.googleusercontent.com",
   DRIVE_SCOPE: "https://www.googleapis.com/auth/drive.readonly",
   AI_ENDPOINT: "/api/ai",
   AI_PROVIDER_LABEL: "Gemini",
