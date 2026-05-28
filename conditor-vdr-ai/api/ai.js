@@ -9,7 +9,7 @@
 // Swap providers by editing callGemini() below (e.g. Groq, OpenAI).
 // ============================================================
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash-lite";
 
 export default async function handler(req, res) {
   // Basic CORS (same-origin in production; harmless to include)

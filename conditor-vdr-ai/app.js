@@ -251,7 +251,7 @@ async function askGeminDirect(system, prompt, {maxTokens=800}={}){
   const body = system ? system + "\n\n" + prompt : prompt;
   try{
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${CONFIG.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${CONFIG.GEMINI_API_KEY}`,
       { method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           contents:[{ parts:[{ text: body }] }],
@@ -361,6 +361,10 @@ function topbar(){
     </div>
     <div class="tb-right">
       <div class="provider"><span class="d"></span>${CONFIG.AI_PROVIDER_LABEL} · AI Engine</div>
+      <button class="tour-launch" onclick="startTour()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="11" x2="8" y2="7.5"/><circle cx="8" cy="5.5" r=".5" fill="currentColor" stroke="none"/></svg>
+        Tour
+      </button>
       <button class="connect ${linked?'linked':''}" onclick="connectDrive()">
         ${linked?I.drive:I.drive}
         <span>${linked?'Drive connected':'Connect Google Drive'}</span>
@@ -628,15 +632,37 @@ Instructions:
 
   // Call /api/chat (server proxies to Gemini — no CORS issues)
   const fullPrompt = sys + "\n\nUser: " + q;
+  console.group(`[doNav] query: "${q}"`);
+  console.log("[doNav] step 1 → POST /api/chat");
   let r = await fetch("/api/chat", {
     method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({ prompt: fullPrompt, maxTokens: 600, apiKey: CONFIG.GEMINI_API_KEY })
-  }).then(async res => { const d=await res.json().catch(()=>({})); return res.ok&&d.text ? {text:d.text,live:true} : {error:d.error||"Server error"}; })
-    .catch(e => ({error:e.message}));
+  }).then(async res => {
+    const d=await res.json().catch(()=>({}));
+    if(res.ok && d.text){ console.log("[doNav] step 1 ✓ /api/chat OK", {textLen:d.text.length}); return {text:d.text,live:true}; }
+    console.warn("[doNav] step 1 ✗ /api/chat failed", {status:res.status, error:d.error});
+    return {error:d.error||"Server error "+res.status};
+  }).catch(e => { console.warn("[doNav] step 1 ✗ /api/chat network error", e.message); return {error:e.message}; });
+
   // Fallback: direct browser call
-  if(!r.text && CONFIG.GEMINI_API_KEY) r = await askGeminDirect(sys, q, {maxTokens:600});
+  if(!r.text){
+    console.log("[doNav] step 2 → askGeminDirect (browser-side Gemini)");
+    if(CONFIG.GEMINI_API_KEY){
+      r = await askGeminDirect(sys, q, {maxTokens:600});
+      if(r.text) console.log("[doNav] step 2 ✓ askGeminDirect OK", {textLen:r.text.length});
+      else console.warn("[doNav] step 2 ✗ askGeminDirect failed", r.error);
+    } else {
+      console.warn("[doNav] step 2 ✗ skipped — no CONFIG.GEMINI_API_KEY");
+    }
+  }
+
   // Fallback: /api/ai backend
-  if(!r.text) r = await askAI(sys, q, {maxTokens:600});
+  if(!r.text){
+    console.log("[doNav] step 3 → askAI (/api/ai)");
+    r = await askAI(sys, q, {maxTokens:600});
+    if(r.text) console.log("[doNav] step 3 ✓ askAI OK", {textLen:r.text.length});
+    else console.warn("[doNav] step 3 ✗ askAI failed", r.error);
+  }
 
   let answer=null, jumpTo=null;
   if(r.text){
@@ -648,12 +674,19 @@ Instructions:
     } else {
       answer = r.text.trim();
     }
+    console.log("[doNav] answer source: AI", {jumpTo});
   }
 
   if(!answer){
-    if(state.source==="demo"){ const fb=navFallback(q); answer=fb.answer; jumpTo=fb.jumpTo; }
-    else answer=`I couldn't reach the AI (${r.error}).`;
+    if(state.source==="demo"){
+      const fb=navFallback(q); answer=fb.answer; jumpTo=fb.jumpTo;
+      console.warn("[doNav] all AI paths failed → using navFallback (demo mode)", {query:q, fallbackAnswer:answer.slice(0,80)});
+    } else {
+      answer=`I couldn't reach the AI (${r.error}).`;
+      console.error("[doNav] all AI paths failed", {error:r.error});
+    }
   }
+  console.groupEnd();
 
   document.getElementById("navPending")?.remove();
   state.chat.push({role:"ai",text:answer,jumpTo}); state.busy=false; renderView();
@@ -1010,16 +1043,11 @@ function navFallback(q){
   if(/^(thanks|thank you|cheers|great|perfect|brilliant)/i.test(ql))
     return {answer:"Happy to help. Let me know if you need anything else from the data room.",jumpTo:null};
 
-  // General knowledge / off-topic (stock prices, news, maths, etc.)
-  const offTopic=/stock price|weather|news|who (is|was|are)|what is \w+(?! (in|at|on|the))|how (do|does|to|many)|calculate|convert|translate|tell me a joke|capital of/i;
-  if(offTopic.test(ql))
-    return {answer:"I'm focused on this deal's data room — I can't look up live information or answer general knowledge questions. Try asking me where to find a specific document, or use the **Navigate & Ask** chips above for deal-relevant queries.",jumpTo:null};
-
   // PE / deal questions with no matching doc
   if(/valuation|multiple|irr|return|exit|entry|deal|ebitda|pe|private equity|due diligence/i.test(ql))
-    return {answer:"That sounds deal-related. I don't have live AI in demo mode, but you can explore the financial workstream — try **Audited Accounts FY2024** or **Management Accounts** in the sidebar, then use the **Financial Extract** tab to build the EBITDA bridge.",jumpTo:"d7"};
+    return {answer:"That sounds deal-related. Try **Audited Accounts FY2024** or **Management Accounts** in the sidebar, then use the **Financial Extract** tab to build the EBITDA bridge.",jumpTo:"d7"};
 
-  return {answer:"I didn't find a document that matches that. Try asking about something in the data room — financials, contracts, HR, tax, or the cap table.",jumpTo:null};
+  return {answer:"I'm not sure where that is in the data room. Try rephrasing, or use the **Navigate & Ask** tab for AI-powered answers to any question.",jumpTo:null};
 }
 
 // ============================================================
@@ -1032,3 +1060,169 @@ function bootDemo(){
   state.tab="overview"; render();
 }
 bootDemo();
+if(!localStorage.getItem("conditor_tour_done")) setTimeout(startTour, 500);
+
+// ============================================================
+// ONBOARDING TOUR
+// ============================================================
+const TOUR_STEPS = [
+  {
+    title: "Welcome to Conditor VDR AI",
+    body: "Conditor helps investment teams navigate Virtual Data Rooms more efficiently — reducing manual work around document navigation, information retrieval, and financial formatting. This quick tour covers the six core workflows.",
+    anchor: null,
+  },
+  {
+    title: "Your Data Room",
+    body: "The left panel shows the full document tree for the deal room. In demo mode you're exploring Project Meridian — a fictional B2B facilities management deal. Connect Google Drive to load a real deal.",
+    anchor: ".side", pos: "right",
+  },
+  {
+    title: "Six Workflows",
+    body: "Each tab unlocks a different AI workflow. Jump between them at any point — your AI results and chat history are preserved across tabs throughout your session.",
+    anchor: ".tabs", pos: "bottom",
+  },
+  {
+    title: "Data Room Overview",
+    body: "An AI-generated snapshot of the entire deal — document counts by category, deal metrics, and a structured narrative to orient your investment team before deep-dive diligence.",
+    anchor: ".tabs .tab:nth-child(1)", pos: "bottom",
+  },
+  {
+    title: "Natural Language Search",
+    body: "Ask questions like 'Find the latest management accounts' or 'What is the customer concentration for this business?' and the AI locates relevant documents instantly.",
+    anchor: ".tabs .tab:nth-child(2)", pos: "bottom",
+  },
+  {
+    title: "AI Document Summaries",
+    body: "Select any document from the left panel and get an AI summary in seconds — covering key clauses, financial figures, risks, and management commentary.",
+    anchor: ".tabs .tab:nth-child(3)", pos: "bottom",
+  },
+  {
+    title: "Financial Data Extraction",
+    body: "Automatically extract and standardise financial data into Conditor's preferred format — including EBITDA adjustments, add-backs, and management account restructuring.",
+    anchor: ".tabs .tab:nth-child(4)", pos: "bottom",
+  },
+  {
+    title: "Inconsistency Detection",
+    body: "Cross-references documents to surface conflicts across management accounts, forecasts, and presentations — so risks are flagged before they surface in deal meetings.",
+    anchor: ".tabs .tab:nth-child(5)", pos: "bottom",
+  },
+  {
+    title: "Deal Checklist Reconciliation",
+    body: "Paste your diligence request list or Deal Binder checklist and instantly see which documents are present, missing, duplicated, or additional in the data room.",
+    anchor: ".tabs .tab:nth-child(6)", pos: "bottom",
+  },
+  {
+    title: "Connect Your Own Deal",
+    body: "Ready to run Conditor on a real deal? Click 'Connect Google Drive' to link a folder and let the AI work against your own data room. Or keep exploring in demo mode.",
+    anchor: ".connect", pos: "left",
+  },
+];
+
+const tour = { active: false, step: 0 };
+
+function startTour(){
+  tour.active = true;
+  tour.step = 0;
+  renderTourStep();
+}
+
+function endTour(){
+  tour.active = false;
+  const el = document.getElementById("tour-wrap");
+  if(el) el.remove();
+  localStorage.setItem("conditor_tour_done", "1");
+}
+
+function tourNext(){
+  if(tour.step >= TOUR_STEPS.length - 1){ endTour(); return; }
+  tour.step++;
+  renderTourStep();
+}
+
+function tourPrev(){
+  if(tour.step <= 0) return;
+  tour.step--;
+  renderTourStep();
+}
+
+function renderTourStep(){
+  let wrap = document.getElementById("tour-wrap");
+  if(wrap) wrap.remove();
+  if(!tour.active) return;
+
+  const step = TOUR_STEPS[tour.step];
+  const isLast = tour.step === TOUR_STEPS.length - 1;
+  const isFirst = tour.step === 0;
+  const pct = Math.round(((tour.step + 1) / TOUR_STEPS.length) * 100);
+
+  wrap = document.createElement("div");
+  wrap.id = "tour-wrap";
+  wrap.style.cssText = "position:fixed;inset:0;z-index:200;pointer-events:none";
+
+  const navHtml = `
+    <div class="tour-progress"><div class="tour-progress-bar" style="width:${pct}%"></div></div>
+    <div class="tour-btns">
+      <span class="tour-counter">${tour.step + 1} / ${TOUR_STEPS.length}</span>
+      <button class="tour-btn skip" onclick="endTour()">Skip</button>
+      ${!isFirst ? `<button class="tour-btn sec" onclick="tourPrev()">Back</button>` : ""}
+      <button class="tour-btn prim" onclick="tourNext()">${isLast ? "Finish ✓" : "Next →"}</button>
+    </div>`;
+
+  if(!step.anchor){
+    // Centered welcome modal
+    wrap.innerHTML = `
+      <div class="tour-center-bg"></div>
+      <div class="tour-tip center" style="pointer-events:all">
+        <div class="tour-welcome-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="tour-eyebrow">Getting started</div>
+        <div class="tour-title">${step.title}</div>
+        <div class="tour-body">${step.body}</div>
+        ${navHtml}
+      </div>`;
+  } else {
+    const target = document.querySelector(step.anchor);
+    if(!target){ tourNext(); return; }
+
+    const rect = target.getBoundingClientRect();
+    const pad = 7;
+    const sr = { top: rect.top - pad, left: rect.left - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 };
+
+    const TIP_W = 320;
+    let tipStyle = "", arrowClass = "";
+
+    if(step.pos === "bottom"){
+      const tipTop = sr.top + sr.height + 16;
+      let tipLeft = sr.left + sr.width / 2 - TIP_W / 2;
+      tipLeft = Math.max(16, Math.min(tipLeft, window.innerWidth - TIP_W - 16));
+      // Clamp arrow to follow real center
+      const arrowOff = Math.round(sr.left + sr.width / 2 - tipLeft);
+      tipStyle = `top:${tipTop}px;left:${tipLeft}px;width:${TIP_W}px;--arrow-left:${arrowOff}px`;
+      arrowClass = "arrow-top";
+    } else if(step.pos === "right"){
+      const tipLeft = sr.left + sr.width + 16;
+      const tipTop = Math.max(16, sr.top + sr.height / 2 - 110);
+      tipStyle = `top:${tipTop}px;left:${tipLeft}px;width:${TIP_W}px`;
+      arrowClass = "arrow-left";
+    } else if(step.pos === "left"){
+      const tipLeft = Math.max(16, sr.left - TIP_W - 16);
+      const tipTop = Math.max(16, sr.top + sr.height / 2 - 110);
+      tipStyle = `top:${tipTop}px;left:${tipLeft}px;width:${TIP_W}px`;
+      arrowClass = "arrow-right";
+    }
+
+    wrap.innerHTML = `
+      <div class="tour-spotlight" style="top:${sr.top}px;left:${sr.left}px;width:${sr.width}px;height:${sr.height}px"></div>
+      <div class="tour-tip ${arrowClass}" style="${tipStyle};pointer-events:all">
+        <div class="tour-eyebrow">Step ${tour.step + 1} of ${TOUR_STEPS.length}</div>
+        <div class="tour-title">${step.title}</div>
+        <div class="tour-body">${step.body}</div>
+        ${navHtml}
+      </div>`;
+  }
+
+  document.body.appendChild(wrap);
+}
