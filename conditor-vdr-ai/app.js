@@ -939,7 +939,25 @@ function navFallback(q){
     [/article|incorporat|register|constitut/,"d2","Constitutional documents are in 01. Corporate & Legal."],
   ];
   for(const [re,id,a] of rules){ if(re.test(ql)) return {answer:a,jumpTo:id}; }
-  return {answer:"I couldn't match that to a specific file. Try a workstream (financial, commercial, legal, HR, tax) or a document type.",jumpTo:null};
+
+  // Greetings
+  if(/^(hi|hello|hey|good\s*(morning|afternoon|evening)|howdy)/i.test(ql))
+    return {answer:"Hello! I'm Conditor VDR AI. Ask me where to find a document in this data room, or try the tabs above — **Summarise** reads individual files, **Financial Extract** builds an EBITDA bridge, and **Inconsistencies** flags risks across the room.",jumpTo:null};
+
+  // Thanks
+  if(/^(thanks|thank you|cheers|great|perfect|brilliant)/i.test(ql))
+    return {answer:"Happy to help. Let me know if you need anything else from the data room.",jumpTo:null};
+
+  // General knowledge / off-topic (stock prices, news, maths, etc.)
+  const offTopic=/stock price|weather|news|who (is|was|are)|what is \w+(?! (in|at|on|the))|how (do|does|to|many)|calculate|convert|translate|tell me a joke|capital of/i;
+  if(offTopic.test(ql))
+    return {answer:"I'm focused on this deal's data room — I can't look up live information or answer general knowledge questions. Try asking me where to find a specific document, or use the **Navigate & Ask** chips above for deal-relevant queries.",jumpTo:null};
+
+  // PE / deal questions with no matching doc
+  if(/valuation|multiple|irr|return|exit|entry|deal|ebitda|pe|private equity|due diligence/i.test(ql))
+    return {answer:"That sounds deal-related. I don't have live AI in demo mode, but you can explore the financial workstream — try **Audited Accounts FY2024** or **Management Accounts** in the sidebar, then use the **Financial Extract** tab to build the EBITDA bridge.",jumpTo:"d7"};
+
+  return {answer:"I didn't find a document that matches that. Try asking about something in the data room — financials, contracts, HR, tax, or the cap table.",jumpTo:null};
 }
 
 // ============================================================
