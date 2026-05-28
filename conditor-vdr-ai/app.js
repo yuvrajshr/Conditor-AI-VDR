@@ -708,7 +708,7 @@ ${history}
 
 Instructions:
 - ALWAYS answer the question directly. Never say you can only help with data room questions or redirect the user away from their question.
-- For general questions (finance, stocks, markets, news, concepts, etc.) — answer from your training knowledge. If you lack real-time data (e.g. live stock prices), briefly acknowledge that and then share what you do know on the topic.
+- For general questions (finance, stocks, markets, news, concepts, etc.) — you have access to Google Search for real-time data. Use it to look up live stock prices, current news, recent events, and up-to-date information. Always provide the actual answer rather than directing the user elsewhere.
 - Answer naturally and helpfully in British English.
 - If your answer relates to a specific document from the list above, add a final line: DOC:[id]  (e.g. DOC:d2)
 - If no specific document is relevant, do not add a DOC line.
