@@ -250,7 +250,7 @@ async function askGeminDirect(system, prompt, {maxTokens=800}={}){
   if(!CONFIG.GEMINI_API_KEY) return { error: "No API key" };
   try{
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`,
       { method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           system_instruction:{ parts:[{text: system}] },
@@ -622,8 +622,23 @@ ANSWER: <your response in British English — conversational for chat, precise f
 DOC: <[id] of the best matching document, or NONE if not applicable>`;
   const r=await askAIWithFallback(sys,`USER: ${q}`,{maxTokens:400});
   let answer,jumpTo=null;
-  if(r.text){ const m=r.text.match(/ANSWER:\s*([\s\S]*?)\s*(?:DOC:\s*(\S+))?$/i);
-    if(m){ answer=m[1].trim(); const rawId=(m[2]||"").replace(/[\[\]]/g,""); if(rawId&&rawId!=="NONE"&&state.docIndex[rawId]&&state.docIndex[rawId].type==="doc") jumpTo=rawId; } else answer=r.text.trim(); }
+  if(r.text){
+    // Robust parsing — handle both structured ANSWER:/DOC: and free-form responses
+    const answerIdx = r.text.search(/ANSWER:/i);
+    if(answerIdx !== -1){
+      let rest = r.text.slice(answerIdx + 7).trim();
+      const docIdx = rest.search(/\bDOC:/i);
+      if(docIdx !== -1){
+        const rawId = rest.slice(docIdx + 4).trim().replace(/[\[\]\s]/g,"").split(/\s/)[0];
+        answer = rest.slice(0, docIdx).trim();
+        if(rawId && rawId.toUpperCase()!=="NONE" && state.docIndex[rawId] && state.docIndex[rawId].type==="doc") jumpTo=rawId;
+      } else {
+        answer = rest;
+      }
+    } else {
+      answer = r.text.trim(); // Gemini replied freely without the format — use it as-is
+    }
+  }
   if(!answer){ if(state.source==="demo"){ const fb=navFallback(q); answer=fb.answer; jumpTo=fb.jumpTo; } else answer=`I couldn't reach the AI backend (${r.error}). I can still help once the backend is live — or browse the tree on the left.`; }
   document.getElementById("navPending")?.remove();
   state.chat.push({role:"ai",text:answer,jumpTo}); state.busy=false; renderView();
