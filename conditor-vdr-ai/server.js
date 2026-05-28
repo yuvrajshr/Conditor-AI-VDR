@@ -30,6 +30,7 @@ function geminiRequest(apiKey, prompt, maxTokens) {
     const model = GEMINI_MODEL;
     const payload = {
       contents: [{ parts: [{ text: prompt }] }],
+      tools: [{ google_search: {} }],
       generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 }
     };
     const body = JSON.stringify(payload);

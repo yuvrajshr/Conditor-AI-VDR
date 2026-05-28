@@ -43,6 +43,7 @@ async function callGemini({ key, system, prompt, maxTokens }) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
   const payload = {
     contents: [{ role: "user", parts: [{ text: prompt }] }],
+    tools: [{ google_search: {} }],
     generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens },
   };
   if (system) payload.systemInstruction = { parts: [{ text: system }] };
