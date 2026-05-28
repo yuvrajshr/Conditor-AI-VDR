@@ -1155,6 +1155,15 @@ const FALLBACK={
 - Confirm working capital line (NBFC ₹25L) terms and renewal; short-term borrowing adds refinancing risk.
 - Technology and SaaS agreements include 2 critical platform contracts on monthly rolling terms — negotiate minimum 12-month lock-in as a Series A condition.`,
   summaries:{
+    d1:`**Overview** BharatKart Commerce Pvt. Ltd. — Series A investor deck (April 2026). D2C Home & Living and Apparel platform; 38-page deck covers investment thesis, financials and team.
+**Key points**
+- FY2024 revenue ₹842 Lakhs (+62% YoY); EBITDA ₹56 Lakhs (6.6% margin) — first profitable year.
+- D2C channel (own app/website) growing to 38% of revenue; LTV:CAC 4.9x and improving.
+- Raising ₹20–25 Crore Series A at ₹80–100 Crore pre-money; proceeds split 40% marketing, 35% tech/supply chain, 25% working capital.
+- Team: ex-Flipkart CEO, ex-Walmart Labs CTO; seed backing from Matrix Partners India.
+**Deal considerations**
+- Marketplace dependency (Amazon + Flipkart = 56% revenue) is the primary risk — Series A thesis rests on D2C shift executing as modelled.
+- Late GST filings in FY2024 (Q2 & Q3) warrant tax counsel clearance before close.`,
     d2:`**Overview** Financial Model covering FY2022 actuals through FY2025E projection (₹ Lakhs).
 **Key points**
 - Revenue CAGR FY2022–FY2024: 73%; FY2025E target ₹1,280L (+52% YoY).

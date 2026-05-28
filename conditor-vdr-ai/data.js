@@ -160,6 +160,151 @@ const TREE = {
 
 // ---- Rich document content (what the "AI" reads) ------------
 const DOC_CONTENT = {
+  d1: {
+    title: "Company Deck — BharatKart Commerce Pvt. Ltd.",
+    body: `BHARATKART COMMERCE PVT. LTD. — COMPANY DECK
+Series A Fundraise | April 2026 | Confidential
+
+─────────────────────────────────────────────
+EXECUTIVE SUMMARY
+─────────────────────────────────────────────
+BharatKart is an Indian D2C e-commerce platform specialising in Home & Living and Apparel, founded in September 2020 and headquartered in Mumbai, Maharashtra. The company serves 14,500+ monthly active customers across its own app/website and leading marketplaces (Amazon, Flipkart). After three years of investment, BharatKart turned EBITDA-positive in FY2024 (₹56 Lakhs, 6.6% margin) and is targeting ₹1,280 Lakhs revenue with 11.6% EBITDA margin in FY2025E.
+
+RAISE: Series A — ₹20–25 Crore primary at ₹80–100 Crore pre-money valuation.
+USE OF FUNDS: D2C channel scaling (40%), supply chain & tech (35%), working capital (25%).
+
+─────────────────────────────────────────────
+COMPANY OVERVIEW
+─────────────────────────────────────────────
+Legal name:    BharatKart Commerce Pvt. Ltd.
+CIN:           U74999MH2020PTC345678
+Founded:       September 2020
+Registered:    Mumbai, Maharashtra (RoC Maharashtra)
+Directors:     Rahul Sharma (CEO & Co-founder), Priya Mehta (CTO & Co-founder)
+Employees:     142 FTE (March 2026)
+Offices:       Mumbai (HQ), Bengaluru (Tech), Delhi NCR (Sales)
+Warehouses:    Mumbai, Pune, Bengaluru (3PL-managed)
+
+─────────────────────────────────────────────
+THE PROBLEM & OPPORTUNITY
+─────────────────────────────────────────────
+India's D2C e-commerce market is projected to reach $60B by FY2027 (CAGR 27%). Home & Living and Apparel represent 38% of total D2C GMV. Key pain points for consumers:
+- Inconsistent product quality from unbranded marketplace sellers
+- Poor post-purchase experience (returns, customer service)
+- Lack of curated, affordable premium alternatives
+
+BharatKart addresses this with a vertically integrated supply chain, proprietary quality standards, and a loyalty-first retention model.
+
+─────────────────────────────────────────────
+PRODUCT & BUSINESS MODEL
+─────────────────────────────────────────────
+Categories:    Home & Living (60% of GMV), Apparel (40%)
+SKUs:          1,200+ active SKUs; 350+ exclusive / private label
+Channels:
+  Own Website & App (D2C):    38% of net revenue (growing)
+  Amazon:                     35% of net revenue
+  Flipkart:                   21% of net revenue
+  Other marketplaces:          6% of net revenue
+
+Avg Order Value:    ₹1,240 (FY2024); ₹1,380E (FY2025E)
+Repeat Purchase %:  54% of orders from repeat customers (FY2024)
+NPS Score:          68 (FY2024), up from 51 in FY2022
+
+Revenue model: Product sales (gross); D2C orders ship directly from warehouse with 2-day SLA. Marketplace orders fulfilled via FBA (Amazon) and Flipkart Fulfillment.
+
+─────────────────────────────────────────────
+FINANCIAL HIGHLIGHTS
+─────────────────────────────────────────────
+                         FY2022   FY2023   FY2024   FY2025E
+Net Revenue (₹ Lakhs)     280      520      842     1,280
+Gross Margin %            37.1%    39.0%    42.3%    46.0%
+EBITDA (₹ Lakhs)          (42)     (28)      56       148
+EBITDA Margin %          -15.0%   -5.4%    +6.6%   +11.6%
+PAT (₹ Lakhs)             (62)     (54)      17        74
+GMV (₹ Lakhs)             340      640     1,050    1,600
+Monthly Active Customers 2,800   5,400    9,200   14,500
+CAC (₹)                   820      640      450      360
+LTV (₹)                  1,200   1,680    2,200    3,100
+LTV:CAC Ratio             1.5x     2.6x     4.9x     8.6x
+
+─────────────────────────────────────────────
+UNIT ECONOMICS (FY2024 BLENDED)
+─────────────────────────────────────────────
+D2C Contribution Margin:        21%
+Marketplace Contribution Margin: -7.2% (blended; Electronics -28%, Apparel -3%)
+Breakeven D2C volume:           1,800 units/month
+
+Note: Blended CM is improving as D2C mix grows. Series A proceeds will accelerate D2C channel shift.
+
+─────────────────────────────────────────────
+TRACTION & GROWTH
+─────────────────────────────────────────────
+- 3x revenue growth FY2022–FY2024 (73% CAGR)
+- First profitable quarter: Q3 FY2024
+- 9,200 MACs in FY2024; targeting 14,500 by FY2025E
+- App downloads: 620,000+ (March 2026)
+- Google Play Store rating: 4.4 / 5
+- Returns rate: 20% (industry avg 28%)
+
+─────────────────────────────────────────────
+FUNDING HISTORY
+─────────────────────────────────────────────
+Round       Date       Investors                  Amount (₹ Cr)  Pre-money (₹ Cr)
+Angel       Sep 2021   Vikram Nair, Anita Reddy,   2.0             8
+                       Siddharth Joshi
+Seed        Mar 2022   Matrix Partners India       20.0            80
+Series A    Apr 2026   Open (this round)           20–25           80–100
+
+─────────────────────────────────────────────
+COMPETITIVE LANDSCAPE
+─────────────────────────────────────────────
+Competitor         Model           Positioning
+Pepperfry          D2C / Mktplace  Home furniture focus; higher price point
+Urban Ladder       D2C             Premium; limited catalogue depth
+Myntra             Marketplace     Apparel-only; platform, not brand
+WowMomo / similar  Single-brand    Category-specific; no cross-sell
+
+BharatKart's advantage: multi-category private label + curated third-party brands + owned customer relationship.
+
+─────────────────────────────────────────────
+MANAGEMENT TEAM
+─────────────────────────────────────────────
+Rahul Sharma — CEO & Co-founder
+  IIT Bombay (BTech), IIM Ahmedabad (MBA). Ex-Flipkart Category Head (Home, 2016–2020). Led ₹800Cr category P&L.
+
+Priya Mehta — CTO & Co-founder
+  BITS Pilani (CS). Ex-Walmart Labs India (Senior Engineer). Built BharatKart's full-stack platform and data infrastructure from ground up.
+
+VP Finance: Amit Kulkarni — CA (ICAI), ex-Deloitte Transaction Services.
+VP Operations: Sunita Rao — Ex-Delhivery, 12 years logistics.
+VP Marketing: Arjun Das — Ex-boAt, performance marketing specialist.
+
+─────────────────────────────────────────────
+USE OF SERIES A PROCEEDS (₹22.5 Cr midpoint)
+─────────────────────────────────────────────
+D2C channel growth (performance marketing, CRM, loyalty)   ₹9.0 Cr   40%
+Supply chain & tech (warehouse automation, platform)       ₹7.9 Cr   35%
+Working capital (inventory build for scale)                ₹5.6 Cr   25%
+
+─────────────────────────────────────────────
+KEY RISKS (AS DISCLOSED)
+─────────────────────────────────────────────
+1. Marketplace dependency: Amazon and Flipkart account for 56% of revenue. Platform fee increases or de-listing risk would materially impact financials.
+2. GST compliance: Two late quarterly filings in FY2024 (Q2 and Q3); interest and penalty exposure under assessment.
+3. Concentration: Top 10% of customers = 47% of revenue; elevated churn in this cohort.
+4. Working capital: ₹25L NBFC revolving credit line on monthly renewal; subject to refinancing risk at scale.
+5. Technology contracts: 2 critical SaaS platform agreements on monthly rolling terms.
+
+─────────────────────────────────────────────
+CONTACT
+─────────────────────────────────────────────
+Rahul Sharma — rahul@bharatkart.in | +91 98200 12345
+Amit Kulkarni (CFO) — amit@bharatkart.in | +91 98765 43210
+Data Room queries: ir@bharatkart.in
+
+This document is confidential and intended solely for addressees engaged in evaluating a potential investment in BharatKart Commerce Pvt. Ltd.`,
+  },
+
   d2: {
     title: "Financial Model (FY2022–FY2025E)",
     body: `BHARATKART COMMERCE PVT. LTD. — FINANCIAL MODEL
