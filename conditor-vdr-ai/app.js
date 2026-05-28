@@ -848,6 +848,7 @@ function viewExtract(){
   const demoCands=["d2","d30","d31","d37"];
   const cands=state.source==="demo"?demoCands.map(i=>state.docIndex[i]).filter(Boolean):financialCandidates();
   let cur=state.selectedDoc && cands.find(c=>c.id===state.selectedDoc) ? state.selectedDoc : (cands[0]&&cands[0].id);
+  if(cur && state.selectedDoc!==cur) state.selectedDoc=cur;
   const tmpl=getActiveTemplate();
   const cacheKey=cur?"ext_"+cur+"_"+tmpl.id:null;
   const cached=cacheKey?state.aiResults[cacheKey]:null;
