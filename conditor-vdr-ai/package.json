@@ -1,0 +1,11 @@
+{
+  "name": "conditor-vdr-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Conditor Capital — VDR Intelligence. AI assistant for PE due diligence over Google Drive.",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "deploy": "vercel --prod"
+  }
+}
