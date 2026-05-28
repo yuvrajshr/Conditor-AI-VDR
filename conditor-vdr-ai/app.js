@@ -33,6 +33,7 @@ const state = {
   drive: { token: null, connected: false, ready: false, email: null },
   contentCache: {},          // id -> text content
   showConnect: false,
+  showComingSoon: false,
   liveFlags: null,
   selectedTemplate: "tpl_pnl_india",
   customTemplates: [],
@@ -351,8 +352,8 @@ function toast(msg){
 // RENDER SHELL
 // ============================================================
 function render(){
-  app.innerHTML = `${topbar()}<div class="body">${sidePanel()}<div class="work">${tabBar()}<div class="canvas"><div class="view" id="view"></div></div></div></div>${state.showConnect?connectModal():""}${state.showUploadModal?uploadModal():""}`;
-  renderView(); bindSide(); bindModal(); bindUploadModal();
+  app.innerHTML = `${topbar()}<div class="body">${sidePanel()}<div class="work">${tabBar()}<div class="canvas"><div class="view" id="view"></div></div></div></div>${state.showConnect?connectModal():""}${state.showUploadModal?uploadModal():""}${state.showComingSoon?comingSoonModal():""}`;
+  renderView(); bindSide(); bindModal(); bindUploadModal(); bindComingSoonModal();
 }
 
 function topbar(){
@@ -368,9 +369,10 @@ function topbar(){
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="11" x2="8" y2="7.5"/><circle cx="8" cy="5.5" r=".5" fill="currentColor" stroke="none"/></svg>
         Tour
       </button>
-      <button class="connect ${linked?'linked':''}" onclick="connectDrive()">
+      <button class="connect ${linked?'linked':''}" onclick="${linked?'connectDrive()':'showComingSoon()'}">
         ${linked?I.drive:I.drive}
         <span>${linked?'Drive connected':'Connect Google Drive'}</span>
+        ${!linked?`<span class="coming-soon-badge">Coming soon</span>`:''}
       </button>
     </div>
   </div>`;
@@ -520,6 +522,31 @@ function connectModal(){
 function bindModal(){ const bg=document.getElementById("modalBg"); if(bg) bg.onclick=e=>{ if(e.target===bg) closeModal(); }; }
 function closeModal(){ state.showConnect=false; render(); }
 
+function showComingSoon(){ state.showComingSoon=true; render(); }
+function closeComingSoon(){ state.showComingSoon=false; render(); }
+function comingSoonModal(){
+  return `<div class="modal-bg" id="comingSoonBg"><div class="modal" style="max-width:460px">
+    <div class="modal-h" style="background:linear-gradient(160deg,var(--g600) 0%,var(--g800) 100%)">
+      <h3>${I.drive} Google Drive Integration<span class="x" onclick="closeComingSoon()">×</span></h3>
+      <p>Live data room access via Google Drive</p>
+    </div>
+    <div class="modal-b">
+      <div style="text-align:center;padding:8px 0 18px">
+        <div style="width:56px;height:56px;margin:0 auto 16px;background:linear-gradient(135deg,rgba(194,161,77,.15),rgba(194,161,77,.05));border:1.5px solid rgba(194,161,77,.3);border-radius:14px;display:grid;place-items:center">${I.drive}</div>
+        <h3 style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:8px">Pending Google Cloud Verification</h3>
+        <p style="font-size:13.5px;color:var(--muted);line-height:1.65;max-width:340px;margin:0 auto">
+          Live Google Drive access is currently awaiting Google Cloud app verification. Once approved, you'll be able to connect any Drive folder and run all AI workflows directly on your own deal data.
+        </p>
+      </div>
+      <div class="note" style="margin-top:4px">${I.info}<div>Everything works right now with the built-in demo data room — all six AI workflows are fully functional and available to explore.</div></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn gold" onclick="closeComingSoon()">Explore demo instead</button>
+    </div>
+  </div></div>`;
+}
+function bindComingSoonModal(){ const bg=document.getElementById("comingSoonBg"); if(bg) bg.onclick=e=>{ if(e.target===bg) closeComingSoon(); }; }
+
 // ============================================================
 // UPLOAD TEMPLATE MODAL
 // ============================================================
@@ -665,7 +692,7 @@ function bindOverview(){
 // ============================================================
 function viewNavigate(){
   const sugg = state.source==="demo"
-    ? ["Where are the audited accounts?","Show me change-of-control clauses","Which file has customer concentration?","Find the cap table"]
+    ? ["Which year had the best EBITDA margin?","Where is the P&L and financial history?","What's the LTV:CAC ratio?","Which channel has negative contribution margin?"]
     : ["Where are the financial statements?","Find the latest contract","Which file mentions revenue?","Show me anything about employees"];
   return `<div>
     <div class="page-h"><div class="eyebrow">${I.compass} Navigate & Ask</div>
@@ -698,21 +725,35 @@ async function doNav(){
   const cat=Object.values(state.docIndex).filter(d=>d.type==="doc").map(d=>`• [${d.id}] ${nodePath(d.id)}`).join("\n");
   const history=state.chat.slice(-6).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
 
-  const sys=`You are Conditor VDR AI, a helpful and knowledgeable AI assistant. You answer ANY question the user asks — general knowledge, finance, markets, PE concepts, company information, or anything else. You also help navigate a data room when relevant.
+  // Inject actual financial document content so the AI can answer analytical questions
+  const keyDocs = state.source==="demo"
+    ? ["d2","d30","d31","d32","d33","d37","d28","d29","d3"]
+    : [];
+  const docContext = keyDocs
+    .filter(id => DOC_CONTENT && DOC_CONTENT[id])
+    .map(id => `=== ${DOC_CONTENT[id].title} [${id}] ===\n${DOC_CONTENT[id].body}`)
+    .join("\n\n");
 
-Available data room documents:
+  const sys=`You are Conditor VDR AI, a highly capable financial analyst and data room assistant for Conditor Capital. You answer ANY question — analytical, financial, factual, or navigational.
+
+DATA ROOM: ${state.source==="demo" ? `${DEAL.target} (${DEAL.sector}) — ${DEAL.dealStage}` : "Connected Google Drive folder"}
+
+Available documents (ID and path):
 ${cat||"(none loaded)"}
 
-Recent conversation:
+${docContext ? `DOCUMENT CONTENTS (use these to answer analytical questions):\n\n${docContext}` : ""}
+
+Conversation so far:
 ${history}
 
 Instructions:
-- ALWAYS answer the question directly. Never say you can only help with data room questions or redirect the user away from their question.
-- For general questions (finance, stocks, markets, news, concepts, etc.) — you have access to Google Search for real-time data. Use it to look up live stock prices, current news, recent events, and up-to-date information. Always provide the actual answer rather than directing the user elsewhere.
-- Answer naturally and helpfully in British English.
-- If your answer relates to a specific document from the list above, add a final line: DOC:[id]  (e.g. DOC:d2)
-- If no specific document is relevant, do not add a DOC line.
-- Do NOT use any other special formatting — just reply naturally.`;
+- Answer every question directly and specifically. NEVER say "I'm not sure" or redirect when you have data above.
+- For analytical questions (best/worst year, trends, margins, growth rates) — calculate from the document contents above and give a specific, data-backed answer.
+- For document-finding questions — tell the user exactly which file and folder it's in.
+- For general finance/investment questions — answer from your training knowledge.
+- Use markdown for structure (bold, bullets) when it adds clarity.
+- If your answer relates to a specific document, add a final line: DOC:[id]  (e.g. DOC:d2)
+- If no specific document is relevant, do not add a DOC line.`;
 
   // Call /api/chat (server proxies to Gemini — no CORS issues)
   const fullPrompt = sys + "\n\nUser: " + q;
@@ -1168,6 +1209,7 @@ const FALLBACK={
 function navFallback(q){
   const ql=q.toLowerCase();
   const rules=[
+    // Document finding
     [/financial model|projection|forecast|three.?year/,"d2","The **Financial Model** is in **Overview** — 3-year actuals (FY2022–FY2024) plus FY2025E projection. FY2024 revenue ₹842L, EBITDA ₹56L (6.6% margin)."],
     [/cap.?table|sharehold|founder|dilut|ownership/,"d3","The **Cap Table** is in **Overview** — founders hold 53% combined, Matrix Partners India 20% (seed). Proposed Series A at ₹80–100 Cr pre-money."],
     [/gst.?return|tds|tax.?filing/,"d34","**GST Returns** are in **Financials → Tax Compliance and Banking → Tax Filings**. Note: Q2 and Q3 FY2024 returns were filed late."],
@@ -1176,13 +1218,22 @@ function navFallback(q){
     [/sku|unit.?econ|contribution.?margin|per.?unit/,"d37","**SKU Profitability** is in **Financials → Unit Economics and Working Capital**. D2C CM: 21%; marketplace CM: -28% (electronics). Recommend SKU rationalisation."],
     [/cash.?flow|burn|runway|working.?capital/,"d33","**Cash Flow** is in **Financials → Historical Financials**. FY2024 closing cash ₹74L; free cash flow turned positive at ₹4L."],
     [/balance.?sheet|asset|liabilit|net.?debt/,"d32","**Balance Sheet** is in **Financials → Historical Financials**. Net debt ₹31L (cash ₹74L vs debt ₹105L)."],
-    [/p&l|profit.?loss|historical.?financ|three.?year.?p/,"d31","**Historical P&L** is in **Financials → Historical Financials** — FY2022, FY2023, FY2024 side by side."],
+    [/p&l|profit.?loss|historical.?financ|three.?year.?p|pnl/,"d31","**Historical P&L** is in **Financials → Historical Financials** — FY2022, FY2023, FY2024 side by side."],
     [/monthly.?financ|latest.?month|management.?account/,"d30","**Latest Monthly Financials** are in **Financials → Latest** — March 2026, revenue ₹118L, EBITDA 11.9%."],
     [/previous.?round|sha|ssa|seed|investor.?update/,"d38","**Previous Rounds** and legal docs (SHA, SSA) are in **Fundraising → Fundraising History and Legal**. Seed: ₹5 Cr at ₹20 Cr pre-money (Matrix Partners India)."],
     [/incorporat|pan|gst.?cert|moa|aoa|roc/,"d7","**Certificate of Incorporation**, PAN and GST Certificate are in **Company and Compliance → Corporate and Governance**."],
     [/vendor|supplier|procurement/,"d27","**Vendor Partnerships** is in **Business and Operations → Vendor and Procurement**."],
     [/warehouse|lease|propert/,"d21","**Warehouse Leases** are in **Company and Compliance → Legal and Compliance**."],
-    [/audit.?report|statutory.?audit/,"d36","**Audit Reports** are in **Financials → Tax Compliance and Banking → Audit and Compliance**."],
+    [/audit.?report|statutory.?audit|audited.?account|annual.?account/,"d36","**Audit Reports** are in **Financials → Tax Compliance and Banking → Audit and Compliance**. The historical audited P&L figures are in **Financials → Historical Financials → PnL.xlsx** (d31)."],
+    [/financ|accounts|statements|report/,"d31","Financial data is in **Financials** — see **PnL.xlsx** for 3-year history, **Latest Monthly Financials** for March 2026, and the **Financial Model** in Overview for projections."],
+    // Analytical — answered directly from data
+    [/best.?year|highest.?ebitda|most.?profit|peak.?margin/,"d31","**FY2024 was the best year** — first profitable year with EBITDA ₹56L (6.6% margin) vs ₹-28L in FY2023 and ₹-42L in FY2022. Revenue also hit a high of ₹842L, up 62% YoY."],
+    [/worst.?year|decline|loss|lowest|negative.?ebitda/,"d31","**FY2022 saw the steepest losses** — EBITDA was ₹-42L (-15% margin) on revenue of ₹280L. FY2023 improved to ₹-28L (-5.4% margin). The business turned EBITDA-positive only in FY2024."],
+    [/yoy|year.?on.?year|growth.?rate|revenue.?growth/,"d31","Year-on-year revenue growth: **FY2022→FY2023: +86%** (₹280L → ₹520L), **FY2023→FY2024: +62%** (₹520L → ₹842L). EBITDA improved every year, turning positive in FY2024 at ₹56L."],
+    [/margin|gross.?margin|ebitda.?margin/,"d31","Gross margin improved from **37.1% (FY2022) → 39.0% (FY2023) → 42.3% (FY2024)**. EBITDA margin went from -15.0% → -5.4% → +6.6%. Latest month (Mar 2026) shows 44.9% gross margin and 11.9% EBITDA margin."],
+    [/ltv.?cac|payback|unit.?metric|cac|ltv/,"d29","**LTV:CAC is 4.9x** with a payback period of 5.8 months. CAC has improved from ₹820 (FY2022) to ₹450 (FY2024). LTV (24-month projected) is ₹2,200 vs CAC ₹450."],
+    [/negative.?margin|loss.?making|worst.?channel|marketplace.*margin/,"d37","**Marketplace channels are contribution-margin negative**: Electronics -28.2%, Apparel -3.1% on Amazon/Flipkart. D2C channel runs at +21% contribution margin. This is the key risk in the unit economics."],
+    [/runway|months.?cash|cash.?position|how.?much.?cash/,"d33","As of March 2026, cash balance is **₹82L**. Monthly EBITDA is ~₹14L. The business is cash-generative with 14+ months of runway at current burn."],
   ];
   for(const [re,id,a] of rules){ if(re.test(ql)) return {answer:a,jumpTo:id}; }
 
@@ -1195,8 +1246,12 @@ function navFallback(q){
     return {answer:"Happy to help. Let me know if you need anything else from the data room.",jumpTo:null};
 
   // Investment / deal questions with no matching doc
-  if(/valuation|multiple|irr|return|exit|entry|deal|ebitda|series.?a|venture|due diligence/i.test(ql))
-    return {answer:"That sounds deal-related. Try the **Financial Model** in Overview or **Latest Monthly Financials** in the sidebar, then use the **Financial Extract** tab to map figures into a template.",jumpTo:"d2"};
+  if(/valuation|multiple|irr|return|exit|entry|deal|series.?a|venture|due diligence/i.test(ql))
+    return {answer:"That sounds deal-related. Try the **Financial Model** (d2) in Overview or **Latest Monthly Financials** (d30) in Financials. Use the **Financial Extract** tab to map any of the P&L files into a structured template.",jumpTo:"d2"};
+
+  // Catch-all for financial/analytical questions — direct answer from data
+  if(/ebitda|revenue|profit|loss|growth|year|fy20|fy21|fy22|fy23|fy24|fy25|financ/i.test(ql))
+    return {answer:"Here's a quick summary from the data room:\n\n**Revenue:** ₹280L (FY2022) → ₹520L (FY2023) → ₹842L (FY2024) — 62% YoY growth in FY2024.\n**EBITDA:** ₹-42L → ₹-28L → ₹+56L — first profitable year in FY2024 at 6.6% margin.\n**Latest (Mar 2026):** Revenue ₹118L, EBITDA 11.9%, gross margin 44.9%.\n\nSee **PnL.xlsx** for full 3-year history, or the **Financial Model** for projections to FY2025E.",jumpTo:"d31"};
 
   return {answer:"I'm not sure where that is in the data room. Try rephrasing, or use the **Navigate & Ask** tab for AI-powered answers to any question.",jumpTo:null};
 }
@@ -1206,7 +1261,7 @@ function navFallback(q){
 // ============================================================
 function bootDemo(){
   state.source="demo"; state.search=""; state.selectedDoc=null; state.aiResults={}; state.contentCache={}; state.liveFlags=null; state.chat=[];
-  state.selectedTemplate="tpl_pnl_india"; state.customTemplates=[]; state.showUploadModal=false; state.uploadPreview=null;
+  state.selectedTemplate="tpl_pnl_india"; state.customTemplates=[]; state.showUploadModal=false; state.uploadPreview=null; state.showComingSoon=false;
   state.expanded={root:true,f1:true,f2:false,f2a:false,f2b:false,f3:false,f3a:false,f3b:false,f3b1:false,f3b2:false,f3c:false,f3c1:false,f3c2:false,f4:true,f4a:false,f4b:false,f4c:false,f4c1:false,f4c2:false,f4d:false,f5:false,f5a:false,f5b:false,f6:false};
   buildIndex(JSON.parse(JSON.stringify(TREE)));
   state.tab="overview"; render();
