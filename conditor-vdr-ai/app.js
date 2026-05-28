@@ -245,29 +245,32 @@ async function askAI(system, prompt, {maxTokens=1300, timeoutMs=30000}={}){
   }
 }
 
-// Direct Gemini call (browser-side fallback when backend is unavailable)
+// Direct Gemini call — embeds system prompt into the message for maximum compatibility
 async function askGeminDirect(system, prompt, {maxTokens=800}={}){
   if(!CONFIG.GEMINI_API_KEY) return { error: "No API key" };
+  const body = system ? system + "\n\n" + prompt : prompt;
   try{
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${CONFIG.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${CONFIG.GEMINI_API_KEY}`,
       { method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
-          system_instruction:{ parts:[{text: system}] },
-          contents:[{ role:"user", parts:[{text: prompt}] }],
-          generationConfig:{ maxOutputTokens: maxTokens }
+          contents:[{ parts:[{ text: body }] }],
+          generationConfig:{ maxOutputTokens: maxTokens, temperature: 0.7 }
         })
       }
     );
     const data = await res.json().catch(()=>({}));
-    if(!res.ok) return { error: data.error?.message || "Gemini error "+res.status };
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if(!text) return { error: "Empty response" };
+    if(!res.ok){
+      console.error("[Gemini] error", res.status, data);
+      return { error: data.error?.message || "Gemini error "+res.status };
+    }
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if(!text){ console.error("[Gemini] empty response", data); return { error: "Empty response" }; }
     return { text, live: true };
-  }catch(e){ return { error: e.message }; }
+  }catch(e){ console.error("[Gemini] fetch failed", e); return { error: e.message }; }
 }
 
-// Wrapper: tries backend first, falls back to direct Gemini, then returns error
+// Wrapper: tries backend first, falls back to direct Gemini
 async function askAIWithFallback(system, prompt, opts={}){
   const r = await askAI(system, prompt, opts);
   if(r.text) return r;
@@ -603,43 +606,47 @@ async function doNav(){
   const log=document.getElementById("navLog");
   log.insertAdjacentHTML("beforeend",`<div class="msg ai" id="navPending"><div class="av">CC</div><div class="bubble">${spinner("Thinking…")}</div></div>`);
   log.scrollTop=log.scrollHeight;
-  const cat=Object.values(state.docIndex).filter(d=>d.type==="doc").map(d=>`[${d.id}] ${nodePath(d.id)}`).join("\n");
+
+  const cat=Object.values(state.docIndex).filter(d=>d.type==="doc").map(d=>`• [${d.id}] ${nodePath(d.id)}`).join("\n");
   const history=state.chat.slice(-6).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
-  const sys=`You are Conditor VDR AI, a smart assistant for Conditor Capital, a London growth-capital PE firm. You help deal teams navigate data rooms, answer questions about deals, and discuss private equity topics. You are friendly and conversational but sharp and professional.
 
-You have access to a data room with these documents:
-${cat||"(no documents loaded yet)"}
+  const sys=`You are Conditor VDR AI, an intelligent assistant for Conditor Capital, a UK private equity firm. You have two roles:
+1. Answer ANY question the user asks — general knowledge, finance, PE, anything.
+2. Help navigate a data room by pointing users to specific documents.
 
-Conversation history:
+Available data room documents:
+${cat||"(none loaded)"}
+
+Recent conversation:
 ${history}
 
-For every message decide whether the user is:
-A) Looking for a specific document → reply with ANSWER and DOC
-B) Asking a general question, greeting, or discussing PE/deals → reply with just ANSWER (no DOC line needed)
+Instructions:
+- Answer naturally and helpfully in British English.
+- If your answer relates to a specific document from the list above, add a final line: DOC:[id]  (e.g. DOC:d7)
+- If no specific document is relevant, do not add a DOC line.
+- Do NOT use any other special formatting — just reply naturally.`;
 
-Always reply in this format:
-ANSWER: <your response in British English — conversational for chat, precise for navigation>
-DOC: <[id] of the best matching document, or NONE if not applicable>`;
-  const r=await askAIWithFallback(sys,`USER: ${q}`,{maxTokens:400});
-  let answer,jumpTo=null;
+  // Try direct Gemini first (works without backend), then fall back to backend
+  let r = await askGeminDirect(sys, q, {maxTokens:600});
+  if(!r.text) r = await askAI(sys, q, {maxTokens:600});
+
+  let answer=null, jumpTo=null;
   if(r.text){
-    // Robust parsing — handle both structured ANSWER:/DOC: and free-form responses
-    const answerIdx = r.text.search(/ANSWER:/i);
-    if(answerIdx !== -1){
-      let rest = r.text.slice(answerIdx + 7).trim();
-      const docIdx = rest.search(/\bDOC:/i);
-      if(docIdx !== -1){
-        const rawId = rest.slice(docIdx + 4).trim().replace(/[\[\]\s]/g,"").split(/\s/)[0];
-        answer = rest.slice(0, docIdx).trim();
-        if(rawId && rawId.toUpperCase()!=="NONE" && state.docIndex[rawId] && state.docIndex[rawId].type==="doc") jumpTo=rawId;
-      } else {
-        answer = rest;
-      }
+    const docLineMatch = r.text.match(/\nDOC:\s*(\S+)\s*$/);
+    if(docLineMatch){
+      answer = r.text.slice(0, docLineMatch.index).trim();
+      const rawId = docLineMatch[1].replace(/[\[\]]/g,"");
+      if(state.docIndex[rawId]?.type==="doc") jumpTo = rawId;
     } else {
-      answer = r.text.trim(); // Gemini replied freely without the format — use it as-is
+      answer = r.text.trim();
     }
   }
-  if(!answer){ if(state.source==="demo"){ const fb=navFallback(q); answer=fb.answer; jumpTo=fb.jumpTo; } else answer=`I couldn't reach the AI backend (${r.error}). I can still help once the backend is live — or browse the tree on the left.`; }
+
+  if(!answer){
+    if(state.source==="demo"){ const fb=navFallback(q); answer=fb.answer; jumpTo=fb.jumpTo; }
+    else answer=`I couldn't reach the AI (${r.error}).`;
+  }
+
   document.getElementById("navPending")?.remove();
   state.chat.push({role:"ai",text:answer,jumpTo}); state.busy=false; renderView();
 }
