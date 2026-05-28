@@ -547,7 +547,7 @@ function viewNavigate(){
       <p>Ask in plain English. The assistant identifies the right file and takes you straight to it.</p></div>
     <div class="card">
       <div class="suggest">${sugg.map(q=>`<button class="chip" data-q="${escapeHtml(q)}">${escapeHtml(q)}</button>`).join("")}</div>
-      <div class="chat-log" id="navLog">${state.chat.length?state.chat.map(renderMsg).join(""):`<div class="msg ai"><div class="av">CC</div><div class="bubble">Ask me where to find something — I'll point you to the exact file and open it for you.</div></div>`}</div>
+      <div class="chat-log" id="navLog">${state.chat.length?state.chat.map(renderMsg).join(""):`<div class="msg ai"><div class="av">CC</div><div class="bubble">Hi, I'm Conditor VDR AI. Ask me anything — where to find a document, questions about the deal, financials, risks, or general PE topics. I'll point you to the right file when relevant.</div></div>`}</div>
       <div class="chat-input"><input id="navInput" placeholder="Ask where something is…" autocomplete="off"><button class="btn" id="navSend">${I.compass} Find</button></div>
     </div></div>`;
 }
@@ -566,14 +566,29 @@ async function doNav(){
   const input=document.getElementById("navInput"); const q=input.value.trim(); if(!q||state.busy) return;
   state.chat.push({role:"user",text:q}); input.value=""; renderView(); state.busy=true;
   const log=document.getElementById("navLog");
-  log.insertAdjacentHTML("beforeend",`<div class="msg ai" id="navPending"><div class="av">CC</div><div class="bubble">${spinner("Searching the data room…")}</div></div>`);
+  log.insertAdjacentHTML("beforeend",`<div class="msg ai" id="navPending"><div class="av">CC</div><div class="bubble">${spinner("Thinking…")}</div></div>`);
   log.scrollTop=log.scrollHeight;
   const cat=Object.values(state.docIndex).filter(d=>d.type==="doc").map(d=>`[${d.id}] ${nodePath(d.id)}`).join("\n");
-  const sys=`You are Conditor VDR AI helping a UK PE team navigate a data room. Identify the single most relevant document for the user's question. Reply EXACTLY:\nANSWER: <1-2 sentences, British English, where it is and what's in it>\nDOC: <the [id] of the best match, or NONE>`;
-  const r=await askAI(sys,`DATA ROOM:\n${cat}\n\nQUESTION: ${q}`,{maxTokens:300});
+  const history=state.chat.slice(-6).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
+  const sys=`You are Conditor VDR AI, a smart assistant for Conditor Capital, a London growth-capital PE firm. You help deal teams navigate data rooms, answer questions about deals, and discuss private equity topics. You are friendly and conversational but sharp and professional.
+
+You have access to a data room with these documents:
+${cat||"(no documents loaded yet)"}
+
+Conversation history:
+${history}
+
+For every message decide whether the user is:
+A) Looking for a specific document → reply with ANSWER and DOC
+B) Asking a general question, greeting, or discussing PE/deals → reply with just ANSWER (no DOC line needed)
+
+Always reply in this format:
+ANSWER: <your response in British English — conversational for chat, precise for navigation>
+DOC: <[id] of the best matching document, or NONE if not applicable>`;
+  const r=await askAI(sys,`USER: ${q}`,{maxTokens:400});
   let answer,jumpTo=null;
-  if(r.text){ const m=r.text.match(/ANSWER:\s*([\s\S]*?)\s*DOC:\s*(\S+)/i);
-    if(m){ answer=m[1].trim(); const id=m[2].replace(/[\[\]]/g,""); if(state.docIndex[id]&&state.docIndex[id].type==="doc") jumpTo=id; } else answer=r.text.trim(); }
+  if(r.text){ const m=r.text.match(/ANSWER:\s*([\s\S]*?)\s*(?:DOC:\s*(\S+))?$/i);
+    if(m){ answer=m[1].trim(); const rawId=(m[2]||"").replace(/[\[\]]/g,""); if(rawId&&rawId!=="NONE"&&state.docIndex[rawId]&&state.docIndex[rawId].type==="doc") jumpTo=rawId; } else answer=r.text.trim(); }
   if(!answer){ if(state.source==="demo"){ const fb=navFallback(q); answer=fb.answer; jumpTo=fb.jumpTo; } else answer=`I couldn't reach the AI backend (${r.error}). I can still help once the backend is live — or browse the tree on the left.`; }
   document.getElementById("navPending")?.remove();
   state.chat.push({role:"ai",text:answer,jumpTo}); state.busy=false; renderView();
