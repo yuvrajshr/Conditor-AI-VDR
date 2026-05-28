@@ -1,7 +1,7 @@
 // ============================================================
 // Conditor VDR AI — Frontend
 // Works in two modes:
-//   • DEMO   — built-in Project Meridian data (no setup needed)
+//   • DEMO   — built-in BharatKart Commerce data (no setup needed)
 //   • DRIVE  — your real Google Drive (after you add a Client ID)
 // AI runs through the backend at /api/ai (Gemini, free tier).
 // ============================================================
@@ -34,6 +34,10 @@ const state = {
   contentCache: {},          // id -> text content
   showConnect: false,
   liveFlags: null,
+  selectedTemplate: "tpl_pnl_india",
+  customTemplates: [],
+  showUploadModal: false,
+  uploadPreview: null,
 };
 
 // ---------- Build index from a tree ----------
@@ -347,8 +351,8 @@ function toast(msg){
 // RENDER SHELL
 // ============================================================
 function render(){
-  app.innerHTML = `${topbar()}<div class="body">${sidePanel()}<div class="work">${tabBar()}<div class="canvas"><div class="view" id="view"></div></div></div></div>${state.showConnect?connectModal():""}`;
-  renderView(); bindSide(); bindModal();
+  app.innerHTML = `${topbar()}<div class="body">${sidePanel()}<div class="work">${tabBar()}<div class="canvas"><div class="view" id="view"></div></div></div></div>${state.showConnect?connectModal():""}${state.showUploadModal?uploadModal():""}`;
+  renderView(); bindSide(); bindModal(); bindUploadModal();
 }
 
 function topbar(){
@@ -517,6 +521,87 @@ function bindModal(){ const bg=document.getElementById("modalBg"); if(bg) bg.onc
 function closeModal(){ state.showConnect=false; render(); }
 
 // ============================================================
+// UPLOAD TEMPLATE MODAL
+// ============================================================
+function showUploadModal(){ state.showUploadModal=true; render(); }
+function closeUploadModal(){ state.showUploadModal=false; state.uploadPreview=null; render(); }
+function uploadModal(){
+  const p=state.uploadPreview;
+  return `<div class="modal-bg" id="uploadModalBg"><div class="modal">
+    <div class="modal-h"><h3>${I.calc} Upload Custom Template<span class="x" onclick="closeUploadModal()">×</span></h3>
+      <p>Upload a CSV (one field name per row) or a JSON file to define your own extraction structure.</p></div>
+    <div class="modal-b">
+      ${!p?`
+        <div class="upload-zone" id="uploadZone">
+          <input type="file" id="tmplFileInput" accept=".csv,.json" style="display:none">
+          <div class="upload-zone-icon">${I.download}</div>
+          <div class="upload-zone-label">Drop a .csv or .json file here</div>
+          <div class="upload-zone-sub">or <button class="btn ghost" style="padding:5px 12px;font-size:12px" onclick="document.getElementById('tmplFileInput').click()">browse</button></div>
+        </div>
+        <div class="upload-format-hint">
+          <b>CSV:</b> one field name per line<br>
+          <code>Net Revenue</code><code>Gross Profit</code><code>EBITDA</code>
+          <br><b>JSON:</b> <code>{"name":"...","currency":"₹ Lakhs","fields":["...","..."]}</code>
+        </div>`
+      :`<div class="upload-preview">
+          <div class="upload-preview-name">${escapeHtml(p.name||"Custom template")}</div>
+          <div class="upload-preview-cur">Currency: ${escapeHtml(p.currency||"—")}</div>
+          ${p.error?`<div class="err">${escapeHtml(p.error)}</div>`:`
+          <div class="upload-preview-fields">
+            ${(p.fields||[]).slice(0,12).map(f=>`<div class="upload-preview-field">${escapeHtml(f)}</div>`).join("")}
+            ${(p.fields||[]).length>12?`<div class="upload-preview-more">+${(p.fields||[]).length-12} more fields</div>`:''}
+          </div>`}
+        </div>`}
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeUploadModal()">Cancel</button>
+      ${p&&!p.error?`<button class="btn gold" onclick="confirmUploadTemplate()">Use this template</button>`:''}
+    </div>
+  </div></div>`;
+}
+function bindUploadModal(){
+  const bg=document.getElementById("uploadModalBg");
+  if(bg) bg.onclick=e=>{ if(e.target===bg) closeUploadModal(); };
+  const inp=document.getElementById("tmplFileInput");
+  if(inp) inp.onchange=e=>{ if(e.target.files[0]) handleTemplateFile(e.target.files[0]); };
+  const zone=document.getElementById("uploadZone");
+  if(zone){
+    zone.ondragover=e=>{ e.preventDefault(); zone.classList.add("drag-over"); };
+    zone.ondragleave=()=>zone.classList.remove("drag-over");
+    zone.ondrop=e=>{ e.preventDefault(); zone.classList.remove("drag-over"); const f=e.dataTransfer.files[0]; if(f) handleTemplateFile(f); };
+  }
+}
+async function handleTemplateFile(file){
+  const text=await file.text();
+  const ext=file.name.split('.').pop().toLowerCase();
+  let parsed=null;
+  if(ext==='json'){
+    try{
+      const obj=JSON.parse(text);
+      if(!Array.isArray(obj.fields)||obj.fields.length===0){ parsed={error:'JSON must have a "fields" array with at least one entry.'}; }
+      else{ parsed={id:"custom_"+Date.now(),name:obj.name||file.name.replace(/\.json$/,''),description:obj.description||"Custom template",currency:obj.currency||"₹ Lakhs",fields:obj.fields.map(f=>String(f).trim()).filter(Boolean),isCustom:true}; }
+    }catch(e){ parsed={error:"Invalid JSON: "+e.message}; }
+  }else if(ext==='csv'){
+    const fields=text.split('\n').map(l=>l.trim()).filter(Boolean);
+    if(!fields.length){ parsed={error:"CSV appears empty."}; }
+    else{ parsed={id:"custom_"+Date.now(),name:file.name.replace(/\.csv$/,''),description:"Custom template ("+fields.length+" fields)",currency:"₹ Lakhs",fields,isCustom:true}; }
+  }else{ parsed={error:"Unsupported file type. Please upload a .csv or .json file."}; }
+  state.uploadPreview=parsed;
+  render();
+  if(parsed&&!parsed.error) bindUploadModal();
+}
+function confirmUploadTemplate(){
+  const t=state.uploadPreview;
+  if(!t||t.error) return;
+  state.customTemplates.push(t);
+  state.selectedTemplate=t.id;
+  state.showUploadModal=false;
+  state.uploadPreview=null;
+  toast("Template \""+t.name+"\" added");
+  render();
+}
+
+// ============================================================
 // FEATURE 1: OVERVIEW
 // ============================================================
 function countDocs(node){ if(!node) return 0; let n=0; (node.children||[]).forEach(c=> n += c.type==="folder"?countDocs(c):1); return n; }
@@ -529,7 +614,7 @@ function viewOverview(){
       <div class="stat t-gold"><div class="k">Documents</div><div class="v">${total}</div><div class="d">across ${folders} workstreams</div></div>
       <div class="stat t-red"><div class="k">Open Flags</div><div class="v red">${DEMO_FLAGS.length}</div><div class="d">inconsistencies</div></div>
       <div class="stat t-amber"><div class="k">Checklist</div><div class="v amber">2</div><div class="d">items outstanding</div></div>
-      <div class="stat t-green"><div class="k">Jurisdiction</div><div class="v sm">${DEAL.jurisdiction}</div><div class="d">FRS 102</div></div>
+      <div class="stat t-green"><div class="k">Jurisdiction</div><div class="v sm">India</div><div class="d">Ind AS / MCA</div></div>
     </div>` : `
     <div class="stats">
       <div class="stat t-gold"><div class="k">Top-level items</div><div class="v">${(state.tree&&state.tree.children)?state.tree.children.length:'…'}</div><div class="d">in this folder</div></div>
@@ -625,7 +710,7 @@ Instructions:
 - ALWAYS answer the question directly. Never say you can only help with data room questions or redirect the user away from their question.
 - For general questions (finance, stocks, markets, news, concepts, etc.) — answer from your training knowledge. If you lack real-time data (e.g. live stock prices), briefly acknowledge that and then share what you do know on the topic.
 - Answer naturally and helpfully in British English.
-- If your answer relates to a specific document from the list above, add a final line: DOC:[id]  (e.g. DOC:d7)
+- If your answer relates to a specific document from the list above, add a final line: DOC:[id]  (e.g. DOC:d2)
 - If no specific document is relevant, do not add a DOC line.
 - Do NOT use any other special formatting — just reply naturally.`;
 
@@ -743,29 +828,58 @@ function bindSummarise(){
 // ============================================================
 // FEATURE 4: FINANCIAL EXTRACT
 // ============================================================
+// TEMPLATE HELPERS
+// ============================================================
+function allTemplates(){
+  return [...TEMPLATE_LIBRARY, ...state.customTemplates];
+}
+function getActiveTemplate(){
+  return allTemplates().find(t=>t.id===state.selectedTemplate) || TEMPLATE_LIBRARY[0];
+}
+
+// ============================================================
 function financialCandidates(){
   return Object.values(state.docIndex).filter(d=>d.type==="doc" && (
-    /account|financ|p&l|profit|ebitda|management|budget|balance/i.test(d.name) ||
+    /account|financ|p&l|profit|ebitda|management|budget|balance|monthly|revenue|sku|cash.?flow|pnl/i.test(d.name) ||
     (d.mimeType||"").includes("spreadsheet") || /\.(xlsx|csv)$/.test(d.name)
   ));
 }
 function viewExtract(){
-  const cands=state.source==="demo"?["d6","d7","d8","d9"].map(i=>state.docIndex[i]):financialCandidates();
+  const demoCands=["d2","d30","d31","d37"];
+  const cands=state.source==="demo"?demoCands.map(i=>state.docIndex[i]).filter(Boolean):financialCandidates();
   let cur=state.selectedDoc && cands.find(c=>c.id===state.selectedDoc) ? state.selectedDoc : (cands[0]&&cands[0].id);
-  const cached=cur?state.aiResults["ext_"+cur]:null;
+  const tmpl=getActiveTemplate();
+  const cacheKey=cur?"ext_"+cur+"_"+tmpl.id:null;
+  const cached=cacheKey?state.aiResults[cacheKey]:null;
   return `<div>
     <div class="page-h"><div class="eyebrow">${I.calc} Financial Template Extraction</div>
-      <h2>Reformat to Conditor's EBITDA template</h2>
-      <p>Statutory accounts rarely show EBITDA directly — it's derived. Pick a source document and the AI maps the figures into Conditor's internal Adjusted EBITDA bridge.</p></div>
+      <h2>Extract into a structured template</h2>
+      <p>Pick a source document and a template — the AI maps figures into your chosen structure. Upload a CSV or JSON to define your own template.</p></div>
     <div class="card"><h3><span class="card-badge">01</span> Source financial document</h3>
       ${cands.length?`<div class="tmpl-list">${cands.slice(0,8).map(c=>`<div class="tmpl-opt ${cur===c.id?'sel':''}" data-fin="${c.id}">
         <div class="ti">${docIcon(c)}</div><div class="tt"><b>${escapeHtml(c.name.replace(/\.(pdf|xlsx|csv|docx)$/,''))}</b><span>${escapeHtml(nodePath(c.id))}</span></div>
         ${cur===c.id?`<span class="card-badge" style="color:var(--gold-dim)">Selected</span>`:""}</div>`).join("")}</div>`
-        :`<div class="note">${I.info}<div>No obvious financial files detected in this room. Open any document with figures and it can still be extracted.</div></div>`}
+        :`<div class="note">${I.info}<div>No financial files detected. Open any document with figures to extract from it.</div></div>`}
     </div>
-    <div class="card"><h3><span class="card-badge">02</span> Conditor Adjusted EBITDA template</h3>
-      <div class="tmpl-preview">${EBITDA_TEMPLATE_FIELDS.map(f=>{
-        const isAdd=/add back/i.test(f), isTotal=/adjusted ebitda|reported ebitda/i.test(f);
+    <div class="card"><h3><span class="card-badge">02</span> Choose extraction template</h3>
+      <div class="tmpl-lib" id="tmplLib">
+        ${allTemplates().map(t=>`<div class="tmpl-lib-card ${state.selectedTemplate===t.id?'active':''}" data-tmpl="${t.id}">
+          ${t.isCustom?`<span class="tmpl-lib-badge">Custom</span>`:''}
+          <div class="tmpl-lib-name">${escapeHtml(t.name)}</div>
+          <div class="tmpl-lib-desc">${escapeHtml(t.description)}</div>
+          <div class="tmpl-lib-cur">${escapeHtml(t.currency)}</div>
+        </div>`).join('')}
+        <button class="tmpl-lib-card tmpl-lib-upload" id="openUpload">
+          <div class="tmpl-lib-upload-icon">${I.download}</div>
+          <div class="tmpl-lib-name">Upload template</div>
+          <div class="tmpl-lib-desc">CSV or JSON</div>
+        </button>
+      </div>
+    </div>
+    <div class="card"><h3><span class="card-badge">03</span> ${escapeHtml(tmpl.name)} — fields</h3>
+      <div class="tmpl-preview">${tmpl.fields.map(f=>{
+        const isAdd=/add.?back|add-back/i.test(f);
+        const isTotal=/ebitda$|pat$|profit after tax|closing cash|contribution margin %?$|net cash from/i.test(f) && !/margin %/i.test(f);
         return `<div class="tp-row${isAdd?' tp-add':''}${isTotal?' tp-total':''}"><span class="tp-dot"></span><span>${escapeHtml(f)}</span></div>`;
       }).join("")}</div>
       <div class="btn-row mt-14"><button class="btn gold" id="extGen" ${cur?'':'disabled'}>${I.spark} Extract &amp; fill template</button></div>
@@ -773,57 +887,66 @@ function viewExtract(){
     </div></div>`;
 }
 function bindExtract(){
-  document.querySelectorAll("[data-fin]").forEach(el=> el.onclick=()=>{ state.selectedDoc=el.dataset.fin; renderView(); });
+  document.querySelectorAll("[data-fin]").forEach(el=>el.onclick=()=>{ state.selectedDoc=el.dataset.fin; renderView(); });
+  document.querySelectorAll("[data-tmpl]").forEach(el=>el.onclick=()=>{ state.selectedTemplate=el.dataset.tmpl; renderView(); });
+  const up=document.getElementById("openUpload"); if(up) up.onclick=()=>showUploadModal();
   const b=document.getElementById("extGen"); if(!b) return;
   b.onclick=async ()=>{
-    const id=state.selectedDoc; const out=document.getElementById("extOut");
-    out.innerHTML=spinner("Mapping figures into the EBITDA bridge…"); b.disabled=true;
+    const id=state.selectedDoc; const tmpl=getActiveTemplate();
+    const cacheKey="ext_"+id+"_"+tmpl.id;
+    const out=document.getElementById("extOut");
+    out.innerHTML=spinner("Mapping figures into "+tmpl.name+"…"); b.disabled=true;
     const txt=await getDocText(id);
     if(!txt){ out.innerHTML=`<div class="err">No readable figures in this file.</div>`; b.disabled=false; return; }
-    const sys=`You are Conditor VDR AI for a UK PE fund. Extract figures from the source and populate Conditor's Adjusted EBITDA template. Reply ONLY as a markdown table, columns "Line item" and "£'000". Rows in order: Revenue; Gross Profit; Operating Profit (EBIT); Add back: Depreciation; Add back: Amortisation; Reported EBITDA; Add back: Exceptional / restructuring; Add back: Owner discretionary; Adjusted EBITDA. EBITDA = EBIT + Depreciation + Amortisation. Use 0 if an item isn't present. After the table add one line starting "Note:" giving the EBITDA margin %.`;
-    const r=await askAI(sys,`SOURCE: ${state.docIndex[id].name}\n\n${txt.slice(0,16000)}`,{maxTokens:700});
+    const fieldsStr=tmpl.fields.join("; ");
+    const sys=`You are Conditor VDR AI. Extract financial figures from the source document and populate the following template. Reply ONLY as a markdown table with columns "Line item" and "${tmpl.currency}". Rows in this exact order: ${fieldsStr}. Use 0 if a line item is not present. After the table add one line starting "Note:" with key metrics such as margin % or YoY growth.`;
+    const r=await askAI(sys,`SOURCE: ${state.docIndex[id].name}\n\n${txt.slice(0,16000)}`,{maxTokens:800});
     let html;
-    if(r.text) html=renderFinTable(r.text)+srcLine(true);
-    else if(state.source==="demo") html=FALLBACK.extract(id)+srcLine(false);
+    if(r.text) html=renderFinTable(r.text,tmpl)+srcLine(true);
+    else if(state.source==="demo") html=FALLBACK.extract(id,tmpl)+srcLine(false);
     else html=`<div class="err">AI backend error: ${r.error}.</div>`;
-    if(r.text||state.source==="demo") state.aiResults["ext_"+id]=`<div class="ai-out" style="border-left-color:var(--green)">${html}<div class="btn-row mt-14"><button class="btn ghost" onclick="toast('Export to Excel — available when deployed')">${I.download} Export to Excel</button></div></div>`;
-    out.innerHTML=state.aiResults["ext_"+id]||`<div class="ai-out">${html}</div>`; b.disabled=false;
+    if(r.text||state.source==="demo") state.aiResults[cacheKey]=`<div class="ai-out" style="border-left-color:var(--green)">${html}<div class="btn-row mt-14"><button class="btn ghost" onclick="toast('Export to Excel — available when deployed')">${I.download} Export to Excel</button></div></div>`;
+    out.innerHTML=state.aiResults[cacheKey]||`<div class="ai-out">${html}</div>`; b.disabled=false;
   };
 }
-function renderFinTable(md){
+function renderFinTable(md,tmpl){
+  tmpl=tmpl||getActiveTemplate();
+  const currency=tmpl?tmpl.currency:"Value";
+  const title=tmpl?tmpl.name:"Financial Extract";
+  const addBackSet=new Set((tmpl?tmpl.fields:[]).filter(f=>/add.?back|add-back/i.test(f)).map(f=>f.toLowerCase()));
+  const totalSet=new Set((tmpl?tmpl.fields:[]).filter(f=>/ebitda$|pat$|profit after tax|closing cash|contribution margin %?$|net cash from/i.test(f)&&!/margin %/i.test(f)).map(f=>f.toLowerCase()));
   const rows=md.split("\n").filter(l=>l.includes("|")&&!/^\s*\|?[\s:\-|]+\|?\s*$/.test(l));
   if(rows.length<2) return mdToHtml(md);
   let body="",note="";
   rows.forEach((l,i)=>{ const cells=l.split("|").map(c=>c.trim()).filter(c=>c!==""); if(cells.length<2||i===0) return;
     const item=cells[0],val=cells[1]; if(/line item|header/i.test(item)) return;
-    const isTotal=/adjusted ebitda|reported ebitda/i.test(item), isAdd=/add back/i.test(item);
+    const il=item.toLowerCase();
+    const isTotal=totalSet.has(il)||/adjusted ebitda|reported ebitda/i.test(item);
+    const isAdd=addBackSet.has(il)||/add back/i.test(item);
     body+=`<tr class="${isTotal?'total':''} ${isAdd?'addback':''}"><td>${escapeHtml(item)}</td><td class="num">${escapeHtml(val)}</td></tr>`; });
   const nm=md.match(/Note:.*/i); if(nm) note=`<p style="font-size:12px;color:var(--muted);margin-top:10px">${escapeHtml(nm[0])}</p>`;
-  return `<h4>Conditor Adjusted EBITDA — extracted</h4><table class="fin"><thead><tr><th>Line item</th><th style="text-align:right">£'000</th></tr></thead><tbody>${body}</tbody></table>${note}`;
+  return `<h4>${escapeHtml(title)} — extracted</h4><table class="fin"><thead><tr><th>Line item</th><th style="text-align:right">${escapeHtml(currency)}</th></tr></thead><tbody>${body}</tbody></table>${note}`;
 }
 
 // ============================================================
 // FEATURE 5: INCONSISTENCIES / FLAGS
 // ============================================================
 const DEMO_FLAGS=[
-  {sev:"high",title:"Change-of-control triggers in two material agreements",
-   body:"Brookfield NHS Trust contract (£3.2m/yr, 14.6% of revenue) and the NatWest bank facility both contain change-of-control clauses. The facility becomes immediately repayable on completion unless consent is obtained — a condition precedent.",
-   loc:"03. Commercial / Top 20 Customer Contracts · 06. Material Contracts / Bank Facility Agreement",docs:["d11","d20"]},
-  {sev:"high",title:"Customer concentration above Conditor's screening threshold",
-   body:"Top-1 customer (Brookfield NHS) is 14.6% of FY2024 revenue, exceeding Conditor's internal 12% threshold, and is also the source of the growing 90+ day debtor balance.",
-   loc:"03. Commercial / Customer Concentration Analysis",docs:["d12","d10"]},
-  {sev:"high",title:"Leeds site lease expiry + landlord redevelopment notice",
-   body:"Leeds depot lease expires Jul 2026 with no renewal option, and a landlord redevelopment notice has been received. ~70 staff are based there — operational continuity risk inside 8 months of completion.",
-   loc:"06. Material Contracts / Property Leases",docs:["d19","d14"]},
-  {sev:"med",title:"Aged debtor balance deteriorating",
-   body:"90+ day debtors rose from £210k (Jun) to £510k (Oct), of which £310k sits with a single customer. Potential bad-debt / working-capital adjustment to completion accounts.",
-   loc:"02. Financial Information / Aged Debtors & Creditors",docs:["d10"]},
-  {sev:"med",title:"Missing FD service agreement",
-   body:"FD R. Patel is listed as a key person in the census but no signed service agreement is in the room. Key-person retention and restrictive-covenant exposure.",
-   loc:"04. HR & Pensions / Key Employee Service Agreements",docs:["d15","d14"]},
-  {sev:"low",title:"EBITDA quality — add-backs require diligence",
-   body:"FY2024 includes a £180k restructuring exceptional and a £95k owner-discretionary add-back. Both inflate Adjusted EBITDA and should be validated by FDD before being credited in valuation.",
-   loc:"02. Financial Information / Audited Accounts FY2024 · Management Accounts",docs:["d7","d8"]},
+  {sev:"high",title:"Marketplace unit economics are contribution-margin negative",
+   body:"Electronics and apparel SKUs on Amazon/Flipkart run negative contribution margins (-28% and -3% respectively) after platform commissions and CAC. Blended CM is -7.2% on the marketplace channel. Overall profitability depends on D2C scaling as modelled — not yet demonstrated at scale.",
+   loc:"Financials / Unit Economics / SKU Profitability",docs:["d37"]},
+  {sev:"high",title:"Customer concentration — top decile drives 47% of revenue",
+   body:"Top 10% of customers contribute 47% of total revenue. Cohort data shows 6-month retention for the top buyer segment declining in recent quarters. If these power buyers churn, the LTV model is overstated and FY2025E projections are at risk.",
+   loc:"Business and Operations / Customer and Retention",docs:["d29"]},
+  {sev:"med",title:"GST compliance gap — late filings in Q2 and Q3 FY2024",
+   body:"GST returns for Q2 and Q3 FY2024 were filed after the due date. This creates a potential interest and penalty liability under GST law. Obtain a clean-chit certificate from tax counsel before Series A close.",
+   loc:"Financials / Tax Compliance / GST Returns",docs:["d34"]},
+  {sev:"med",title:"Working capital pressure — short-term borrowing and tight cash runway",
+   body:"Cash balance ₹74L against short-term NBFC borrowing of ₹25L. Monthly net revenue only turned cash-positive in FY2024. Seasonal Q3 inventory build relies on the working capital line; renewal terms and NBFC relationship need confirmation.",
+   loc:"Financials / Latest Monthly Financials · Cash Flow",docs:["d30","d33"]},
+  {sev:"low",title:"Two critical SaaS platform agreements on monthly rolling terms",
+   body:"Technology and SaaS Agreements file shows 2 of 3 critical platform contracts (including logistics management system) on rolling monthly terms with no SLA. Recommend locking in minimum 12-month agreements as a Series A condition.",
+   loc:"Company and Compliance / Legal and Compliance / Technology and SaaS Agreements",docs:["d22"]},
 ];
 function viewFlags(){
   if(state.source==="demo") return flagsDemoView();
@@ -862,7 +985,7 @@ function bindFlags(){
   const b=document.getElementById("flagGen");
   if(b){ b.onclick=async ()=>{
     const out=document.getElementById("flagNarr"); out.innerHTML=spinner("Drafting IC-ready risk narrative…"); b.disabled=true;
-    const sys=`You are Conditor VDR AI for a UK PE fund. Write a concise IC-paper risk narrative, British English. Group into **Key risks (conditions precedent)** and **Diligence / monitoring items**. Reference specifics. Under 200 words. Markdown.`;
+    const sys=`You are Conditor VDR AI for a Series A investor in India. Write a concise investment committee risk narrative. Group into **Key risks (conditions precedent)** and **Diligence / monitoring items**. Reference specifics. Under 200 words. Markdown.`;
     const r=await askAI(sys,`Flags in the ${DEAL.target} room:\n`+DEMO_FLAGS.map(f=>`- [${f.sev}] ${f.title}: ${f.body}`).join("\n"),{maxTokens:700});
     const html=r.text?mdToHtml(r.text)+srcLine(true):mdToHtml(FALLBACK.flagNarr)+srcLine(false);
     state.aiResults.flagNarr=html; out.innerHTML=`<div class="ai-out">${html}</div>`; b.disabled=false; };
@@ -874,7 +997,7 @@ function bindFlags(){
     let corpus="";
     for(const d of docs){ const t=await getDocText(d.id); if(t) corpus+=`\n\n===== ${d.name} (${nodePath(d.id)}) =====\n`+t.slice(0,4000); }
     if(!corpus){ out.innerHTML=`<div class="err">No readable documents found to scan.</div>`; s.disabled=false; return; }
-    const sys=`You are Conditor VDR AI for a UK PE fund. Review these data-room documents and flag inconsistencies, risks, and missing detail a buyer should worry about. For each, output markdown: a bullet starting with **[HIGH]**, **[MED]** or **[LOW]**, the issue in one sentence, and which file it relates to. British English. Up to 8 flags.`;
+    const sys=`You are Conditor VDR AI for a Series A investor in India. Review these data-room documents and flag inconsistencies, risks, and missing detail an investor should worry about. For each, output markdown: a bullet starting with **[HIGH]**, **[MED]** or **[LOW]**, the issue in one sentence, and which file it relates to. Up to 8 flags.`;
     const r=await askAI(sys,corpus.slice(0,28000),{maxTokens:900});
     out.innerHTML = r.text ? `<div class="ai-out">${mdToHtml(r.text)}${srcLine(true)}</div>` : `<div class="err">AI backend error: ${r.error}.</div>`;
     state.liveFlags=out.innerHTML; s.disabled=false; };
@@ -919,11 +1042,19 @@ function bindReconcile(){
 }
 function demoReconcile(items){
   const present=Object.values(state.docIndex).filter(d=>d.type==="doc");
-  const MAP={"Certificate of Incorporation":"d1","Articles of Association":"d2","Statutory Registers":"d3","Cap Table":"d4",
-    "Audited Accounts (last 3 years)":"d7","Management Accounts (YTD)":"d8","Budget / Forecast":"d9","Aged Debtors & Creditors":"d10",
-    "Top Customer Contracts":"d11","Customer Concentration Analysis":"d12","Employee Census & Org Chart":"d14",
-    "Key Employee Service Agreements":"d15","Pension Scheme Summary":"d16","Corporation Tax Computations":"d17",
-    "VAT Returns":"d18","Property Leases":"d19","Bank Facility Agreement":"d20","Insurance Policies":"d21"};
+  const MAP={
+    "Certificate of Incorporation":"d7","MoA and AoA":"d10","PAN and GST Certificate":"d8",
+    "ROC Filings (last 3 years)":"d15","Shareholding Structure / Cap Table":"d3",
+    "Board and Shareholder Resolutions":"d13","Company Deck / Investor Presentation":"d1",
+    "Financial Model (3-year projection)":"d2","Latest Monthly Financials":"d30",
+    "Historical P&L (3 years)":"d31","Balance Sheet (latest audited)":"d32",
+    "Cash Flow Statement":"d33","GST Returns (last 4 quarters)":"d34",
+    "TDS Returns (last 4 quarters)":"d35","Audit Reports (last 2 years)":"d36",
+    "SKU Profitability / Unit Economics":"d37","Revenue Analytics by Channel":"d28",
+    "Customer Cohort and Retention Analysis":"d29","Vendor Partnerships (top 10)":"d27",
+    "Warehouse Lease Agreements":"d21","Technology and SaaS Agreements":"d22",
+    "Previous Round Documents (SHA, SSA)":"d39","Investor Updates (last 6 months)":"d41",
+    "Business Licenses and Permits":"d18","Key Business KPIs Dashboard":"d6"};
   const received=[],missing=[],used=new Set();
   items.forEach(it=>{ const id=MAP[it]; if(id&&state.docIndex[id]){ received.push({item:it,file:state.docIndex[id].name}); used.add(id);} else missing.push(it); });
   const extra=present.filter(d=>!used.has(d.id)).map(d=>d.name);
@@ -954,7 +1085,7 @@ document.addEventListener("click", async (e)=>{
   const miss=[...document.querySelectorAll(".recon-col.miss .recon-item span")].map(s=>s.textContent);
   if(!miss.length){ out.innerHTML=`<div class="note">${I.info}<div>Nothing outstanding to chase.</div></div>`; return; }
   out.innerHTML=spinner("Drafting a polite chaser…"); btn.disabled=true;
-  const sys=`You are Conditor VDR AI for a UK PE fund. Draft a short professional email (British English) from the Conditor deal team to the vendor's corporate finance adviser, chasing outstanding due-diligence items. Polite, specific, numbered list. Under 160 words. Markdown.`;
+  const sys=`You are Conditor VDR AI for a Series A investor. Draft a short professional email from the Conditor investment team to the founder's CA/adviser, chasing outstanding due-diligence items for an Indian startup data room. Polite, specific, numbered list. Under 160 words. Markdown.`;
   const r=await askAI(sys,`Outstanding items:\n${miss.map(m=>"- "+m).join("\n")}`,{maxTokens:600});
   const html=r.text?mdToHtml(r.text)+srcLine(true):mdToHtml(FALLBACK.chaser(miss))+srcLine(false);
   out.innerHTML=`<div class="ai-out" style="margin-top:14px">${html}<div class="btn-row mt-12"><button class="btn ghost" onclick="toast('Copied (demo)')">${I.copy} Copy email</button></div></div>`;
@@ -964,92 +1095,107 @@ document.addEventListener("click", async (e)=>{
 // ============================================================
 // DEMO FALLBACK INTELLIGENCE (offline resilience)
 // ============================================================
-const FLAGGED_DEMO=new Set(["d10","d11","d12","d15","d19","d20"]);
+const FLAGGED_DEMO=new Set(["d3","d29","d30","d33","d37","d41"]);
 const FALLBACK={
-  overview:`**01. Corporate & Legal** — Constitutional documents, statutory registers and the cap table; verify ownership, the Marlow Ventures liquidation preference and the 75% drag threshold.
-**02. Financial Information** — Two years of FRS 102 audited accounts plus YTD management accounts and the FY2026 budget; build the Adjusted EBITDA bridge here.
-**03. Commercial** — Customer contracts and concentration; prioritise the Brookfield NHS dependency and change-of-control consents.
-**04. HR & Pensions** — Census, key service agreements and a low-risk DC pension; note the missing FD agreement.
-**05. Tax** — Corporation tax computations and VAT returns; standard clearance review.
-**06. Material Contracts** — Property leases, the NatWest facility and insurance; the Leeds lease and the facility's change-of-control clause are priority items.`,
+  overview:`**Overview** — Company Deck, Financial Model, Cap Table and Investor FAQ; start here for the investment thesis and headline metrics. FY2024 revenue ₹842 Lakhs, EBITDA ₹56 Lakhs (first profitable year).
+**Company and Compliance** — Certificate of Incorporation, PAN, GST, MoA/AoA, ROC filings and shareholding structure; verify clean corporate history with RoC Maharashtra.
+**Business and Operations** — Operational workflow, supply chain, product catalogue, vendor partnerships and revenue analytics by channel (D2C 38%, Amazon 35%, Flipkart 21%).
+**Financials** — Latest monthly P&L, 3-year historical financials, GST/TDS returns, audit reports and SKU-level unit economics; EBITDA margin expanding from -15% (FY2022) to +6.6% (FY2024).
+**Fundraising** — Previous round documents (seed SHA/SSA at ₹20 Cr pre-money), investor updates; proposed Series A ₹20–25 Cr at ₹80–100 Cr pre-money.
+**Archive** — Historical documents from pre-seed phase.`,
   flagNarr:`**Key risks (conditions precedent)**
-- Change-of-control consents required from Brookfield NHS Trust and NatWest; the facility is repayable on completion absent consent.
-- Customer concentration (Brookfield 14.6%) exceeds Conditor's 12% threshold and overlaps with deteriorating debtors.
-- Leeds lease expires Jul 2026 with a redevelopment notice; secure alternative premises pre-completion.
+- Customer concentration: top 10% of customers contribute 47% of revenue and top buyer cohort shows rising churn — LTV model may be overstated.
+- Marketplace unit economics: Apparel and Electronics on Amazon/Flipkart run negative contribution margins — blended profitability depends on D2C channel scaling as planned.
+- GST compliance gap: Q2 and Q3 returns filed late in FY2024 — potential interest and penalty liability; obtain clean-chit certificate from tax counsel before close.
 
 **Diligence / monitoring items**
-- Validate FY2024 add-backs (£180k restructuring, £95k owner discretionary) via FDD before crediting EBITDA.
-- Obtain the FD's signed service agreement and confirm restrictive covenants.
-- Track the 90+ day debtor build (£510k) for a working-capital adjustment.`,
+- Validate FY2025E EBITDA margin expansion assumption (11.6%) — requires D2C mix to reach 42%, which has not yet been demonstrated at scale.
+- Confirm working capital line (NBFC ₹25L) terms and renewal; short-term borrowing adds refinancing risk.
+- Technology and SaaS agreements include 2 critical platform contracts on monthly rolling terms — negotiate minimum 12-month lock-in as a Series A condition.`,
   summaries:{
-    d7:`**Overview** FY2024 statutory accounts (FRS 102, unqualified).
+    d2:`**Overview** Financial Model covering FY2022 actuals through FY2025E projection (₹ Lakhs).
 **Key points**
-- Revenue £21.86m, up 18.7% on FY2023.
-- Operating profit £3.15m; PBT £2.74m.
-- Reported EBITDA ≈ £4.03m.
-- Includes a £180k restructuring exceptional (Leeds).
+- Revenue CAGR FY2022–FY2024: 73%; FY2025E target ₹1,280L (+52% YoY).
+- EBITDA turned positive in FY2024 at ₹56L (6.6% margin); FY2025E model assumes 11.6%.
+- CAC improving: ₹820 (FY2022) → ₹450 (FY2024). LTV:CAC 4.9x.
+- D2C channel mix growing: 28% (FY2022) → 38% (FY2024) → 42% (FY2025E).
 **Deal considerations**
-- The £180k exceptional is an add-back to normalise EBITDA — validate via FDD.`,
-    d20:`**Overview** NatWest commercial term facility, £2.4m outstanding.
+- EBITDA margin expansion depends on D2C scaling and marketplace SKU rationalisation — verify with actual FY2025 monthly trading data.`,
+    d30:`**Overview** Management accounts for March 2026 (latest month) and YTD FY2026.
 **Key points**
-- Amortising, matures 2028, SONIA + 3.1%.
-- Covenants: net debt/EBITDA ≤ 2.5x; interest cover ≥ 4.0x.
+- March revenue ₹118L; EBITDA ₹14L (11.9% margin) — above the FY2025E model assumption.
+- YTD FY2026 revenue ₹1,120L; annualised run-rate ~₹1,416L.
+- Gross margin at 44.9% in March, improving from FY2024 average of 42.3%.
 **Deal considerations**
-- **Change-of-control clause makes the facility immediately repayable on completion** unless consent is obtained.`,
-    d11:`**Overview** Top 20 customer contract summary.
+- Strong March likely includes year-end inventory clearance — review April trends before anchoring to 11%+ EBITDA margin.`,
+    d37:`**Overview** SKU-level contribution margin analysis for FY2024 across top 50 SKUs.
 **Key points**
-- Brookfield NHS £3.2m/yr — change-of-control consent required.
-- Two top contracts expire within 12 months.
+- D2C contribution margin: 21%. Marketplace contribution margin: -28% (electronics), -3% (apparel).
+- Blended CM negative on marketplace channel due to commissions + CAC.
+- Breakeven D2C volume: ~1,800 units/month at current cost base.
 **Deal considerations**
-- Brookfield consent is a key CP; near-term renewal risk.`,
+- Recommend restricting marketplace SKU mix or renegotiating platform fees as a Series A condition.`,
   },
   genericSummary(c){ if(!c) return "**Overview** Document summary unavailable offline."; return `**Overview** ${c.title}.
 **Key points**
 - ${c.body.split("\n").filter(l=>l.trim()).slice(1,5).map(l=>l.trim()).join("\n- ")}
 **Deal considerations**
-- Review against Conditor's thesis and cross-check with the financial workstream.`; },
-  extract(id){
-    const T={d6:[["Revenue","18,420"],["Gross Profit","6,470"],["Operating Profit (EBIT)","2,260"],["Add back: Depreciation","610"],["Add back: Amortisation","140"],["Reported EBITDA","3,010"],["Add back: Exceptional / restructuring","0"],["Add back: Owner discretionary","0"],["Adjusted EBITDA","3,010"]],
-      d7:[["Revenue","21,860"],["Gross Profit","8,140"],["Operating Profit (EBIT)","3,150"],["Add back: Depreciation","720"],["Add back: Amortisation","160"],["Reported EBITDA","4,030"],["Add back: Exceptional / restructuring","180"],["Add back: Owner discretionary","0"],["Adjusted EBITDA","4,210"]],
-      d8:[["Revenue (10m)","19,340"],["Gross Profit","7,540"],["Operating Profit (EBIT)","3,230"],["Add back: Depreciation","640"],["Add back: Amortisation","140"],["Reported EBITDA","4,010"],["Add back: Exceptional / restructuring","0"],["Add back: Owner discretionary","95"],["Adjusted EBITDA","4,105"]],
-      d9:[["Revenue","25,500"],["Gross Profit","10,073"],["Operating Profit (EBIT)","3,720"],["Add back: Depreciation","760"],["Add back: Amortisation","160"],["Reported EBITDA","4,640"],["Add back: Exceptional / restructuring","0"],["Add back: Owner discretionary","0"],["Adjusted EBITDA","4,640"]]};
-    const rows=T[id]||T.d7;
-    const body=rows.map(r=>{ const t=/adjusted ebitda|reported ebitda/i.test(r[0]),a=/add back/i.test(r[0]);
-      return `<tr class="${t?'total':''} ${a?'addback':''}"><td>${r[0]}</td><td class="num">${r[1]}</td></tr>`; }).join("");
-    const mg={d6:"16.3%",d7:"19.3%",d8:"21.2% (annualised)",d9:"18.2%"};
-    return `<h4>Conditor Adjusted EBITDA — ${DOC_CONTENT[id]?DOC_CONTENT[id].title:''}</h4><table class="fin"><thead><tr><th>Line item</th><th style="text-align:right">£'000</th></tr></thead><tbody>${body}</tbody></table><p style="font-size:12px;color:var(--muted);margin-top:10px">Note: Adjusted EBITDA margin ≈ ${mg[id]||"—"}.</p>`;
+- Review against Conditor's investment thesis for D2C e-commerce and cross-check with the financial workstream.`; },
+  extract(id,tmpl){
+    const currency=tmpl?tmpl.currency:"₹ Lakhs";
+    const title=tmpl?tmpl.name:"P&L Summary";
+    const T={
+      d2:[["Net Revenue","842"],["Cost of Goods Sold","(486)"],["Gross Profit","356"],["Gross Margin %","42.3%"],["Employee Costs","(128)"],["Marketing & Advertising","(94)"],["Technology & Platform","(31)"],["G&A / Overheads","(47)"],["EBITDA","56"],["EBITDA Margin %","6.6%"],["Depreciation & Amortisation","(18)"],["EBIT","38"],["Finance Costs / Interest","(12)"],["Profit Before Tax","26"],["Tax","(9)"],["Profit After Tax (PAT)","17"]],
+      d30:[["Net Revenue","118"],["Cost of Goods Sold","(65)"],["Gross Profit","53"],["Gross Margin %","44.9%"],["Employee Costs","(15)"],["Marketing & Advertising","(11)"],["Technology & Platform","(4)"],["G&A / Overheads","(9)"],["EBITDA","14"],["EBITDA Margin %","11.9%"],["Depreciation & Amortisation","(2)"],["EBIT","12"],["Finance Costs / Interest","(1)"],["Profit Before Tax","11"],["Tax","(4)"],["Profit After Tax (PAT)","7"]],
+      d31:[["Net Revenue","842 / 520 / 280"],["Cost of Goods Sold","(486) / (317) / (176)"],["Gross Profit","356 / 203 / 104"],["Gross Margin %","42.3% / 39.0% / 37.1%"],["EBITDA","56 / (28) / (42)"],["EBITDA Margin %","6.6% / -5.4% / -15.0%"],["Profit After Tax (PAT)","17 / (54) / (62)"]],
+      d37:[["Avg Selling Price (ASP)","₹1,240"],["Cost of Goods (COGS per unit)","₹(720)"],["Gross Margin per unit","₹520"],["Gross Margin %","42.0%"],["Fulfilment & Logistics cost","₹(145)"],["Marketing / CAC (per unit)","₹(161)"],["Payment Gateway fees","₹(17)"],["Returns & Damage allowance","₹(75)"],["Contribution Margin per unit","₹(89) blended / ₹311 D2C"],["Contribution Margin %","-7.2% blended / 21.0% D2C"],["Breakeven volume (monthly)","1,800 units (D2C only)"]]
+    };
+    const addBackSet=new Set((tmpl?tmpl.fields:[]).filter(f=>/add.?back/i.test(f)).map(f=>f.toLowerCase()));
+    const totalSet=new Set((tmpl?tmpl.fields:[]).filter(f=>/ebitda$|pat$|profit after tax|closing cash|contribution margin %?$|net cash from/i.test(f)&&!/margin %/i.test(f)).map(f=>f.toLowerCase()));
+    const rows=T[id]||T.d2;
+    const body=rows.map(r=>{
+      const il=r[0].toLowerCase();
+      const isTotal=totalSet.has(il)||/^ebitda$|^pat$|profit after tax/i.test(r[0]);
+      const isAdd=addBackSet.has(il)||/add back/i.test(r[0]);
+      return `<tr class="${isTotal?'total':''} ${isAdd?'addback':''}"><td>${r[0]}</td><td class="num">${r[1]}</td></tr>`;
+    }).join("");
+    const notes={d2:"EBITDA margin 6.6% (FY2024); first profitable year. Series A target ₹1,500L ARR.",d30:"March EBITDA margin 11.9%; annualised run-rate ~₹1,416L.",d31:"FY2024 / FY2023 / FY2022 — EBITDA turning positive in FY2024.",d37:"Marketplace channels are contribution-margin negative; D2C at 21% CM."};
+    return `<h4>${escapeHtml(title)} — ${DOC_CONTENT[id]?DOC_CONTENT[id].title:''}</h4><table class="fin"><thead><tr><th>Line item</th><th style="text-align:right">${escapeHtml(currency)}</th></tr></thead><tbody>${body}</tbody></table><p style="font-size:12px;color:var(--muted);margin-top:10px">Note: ${notes[id]||"—"}</p>`;
   },
-  chaser(miss){ return `**Subject:** Outstanding due diligence items\n\nDear [Adviser],\n\nThank you for the materials uploaded to date. To progress our diligence, please could you arrange for the following outstanding items:\n\n${miss.map((m,i)=>`${i+1}. ${m}`).join("\n")}\n\nWe would be grateful to receive these by the end of next week to keep to the agreed timetable.\n\nKind regards,\nConditor Capital — Deal Team`; }
+  chaser(miss){ return `**Subject:** Outstanding due diligence items — BharatKart Commerce Pvt. Ltd.\n\nDear [Adviser],\n\nThank you for the materials uploaded to the data room to date. To progress our Series A diligence, we would be grateful if you could arrange the following outstanding items at your earliest convenience:\n\n${miss.map((m,i)=>`${i+1}. ${m}`).join("\n")}\n\nKindly share these by the end of next week so we can maintain the agreed timeline.\n\nBest regards,\nConditor Capital — Investment Team`; }
 };
 function navFallback(q){
   const ql=q.toLowerCase();
   const rules=[
-    [/audit|accounts|fy20|ebitda|p&l|profit/,"d7","The audited figures are in **Audited Accounts FY2024** under 02. Financial Information. FY2024 revenue is £21.86m with reported EBITDA ~£4.03m."],
-    [/change.?of.?control|consent/,"d20","Change-of-control provisions appear in the **Bank Facility Agreement** (repayable on completion without consent) and the Brookfield NHS customer contract."],
-    [/concentration|customer/,"d12","See **Customer Concentration Analysis** in 03. Commercial — top-1 customer is 14.6%, above Conditor's 12% threshold."],
-    [/cap.?table|sharehold|ownership/,"d4","The **Cap Table — Nov 2025** is in 01. Corporate & Legal; founder holds 52%, Marlow Ventures 22%."],
-    [/bank|facility|loan|debt|covenant/,"d20","The **Bank Facility Agreement** is in 06. Material Contracts — £2.4m NatWest term loan with a change-of-control clause."],
-    [/lease|propert|site/,"d19","**Property Leases** is in 06. Material Contracts; note the Leeds lease expires Jul 2026 with a redevelopment notice."],
-    [/debtor|credit|aged|working capital/,"d10","**Aged Debtors & Creditors** is in 02. Financial Information; the 90+ day balance has grown to £510k."],
-    [/employee|staff|hr|headcount|org/,"d14","**Employee Census & Org Chart** is in 04. HR & Pensions — 238 headcount across three sites."],
-    [/pension/,"d16","**Pension Scheme Summary** is in 04. HR & Pensions — a low-risk DC auto-enrolment scheme."],
-    [/tax|vat|corporation/,"d17","Tax materials are in 05. Tax — corporation tax computations and VAT returns."],
-    [/budget|forecast|plan/,"d9","The **FY2026 Budget & Forecast** is in 02. Financial Information — £25.5m revenue target."],
-    [/article|incorporat|register|constitut/,"d2","Constitutional documents are in 01. Corporate & Legal."],
+    [/financial model|projection|forecast|three.?year/,"d2","The **Financial Model** is in **Overview** — 3-year actuals (FY2022–FY2024) plus FY2025E projection. FY2024 revenue ₹842L, EBITDA ₹56L (6.6% margin)."],
+    [/cap.?table|sharehold|founder|dilut|ownership/,"d3","The **Cap Table** is in **Overview** — founders hold 53% combined, Matrix Partners India 20% (seed). Proposed Series A at ₹80–100 Cr pre-money."],
+    [/gst.?return|tds|tax.?filing/,"d34","**GST Returns** are in **Financials → Tax Compliance and Banking → Tax Filings**. Note: Q2 and Q3 FY2024 returns were filed late."],
+    [/revenue.?analytic|channel|gmv|amazon|flipkart|marketplace/,"d28","**Revenue Analytics** is in **Business and Operations → Sales Growth and Analytics**. FY2024: GMV ₹1,050L, D2C 38%, Amazon 35%, Flipkart 21%."],
+    [/cohort|retention|churn|ltv|cac|customer/,"d29","**Customer Cohorts and Retention** is in **Business and Operations → Customer and Retention**. LTV:CAC 4.9x; 6-month retention improving to ~22% for recent cohorts."],
+    [/sku|unit.?econ|contribution.?margin|per.?unit/,"d37","**SKU Profitability** is in **Financials → Unit Economics and Working Capital**. D2C CM: 21%; marketplace CM: -28% (electronics). Recommend SKU rationalisation."],
+    [/cash.?flow|burn|runway|working.?capital/,"d33","**Cash Flow** is in **Financials → Historical Financials**. FY2024 closing cash ₹74L; free cash flow turned positive at ₹4L."],
+    [/balance.?sheet|asset|liabilit|net.?debt/,"d32","**Balance Sheet** is in **Financials → Historical Financials**. Net debt ₹31L (cash ₹74L vs debt ₹105L)."],
+    [/p&l|profit.?loss|historical.?financ|three.?year.?p/,"d31","**Historical P&L** is in **Financials → Historical Financials** — FY2022, FY2023, FY2024 side by side."],
+    [/monthly.?financ|latest.?month|management.?account/,"d30","**Latest Monthly Financials** are in **Financials → Latest** — March 2026, revenue ₹118L, EBITDA 11.9%."],
+    [/previous.?round|sha|ssa|seed|investor.?update/,"d38","**Previous Rounds** and legal docs (SHA, SSA) are in **Fundraising → Fundraising History and Legal**. Seed: ₹5 Cr at ₹20 Cr pre-money (Matrix Partners India)."],
+    [/incorporat|pan|gst.?cert|moa|aoa|roc/,"d7","**Certificate of Incorporation**, PAN and GST Certificate are in **Company and Compliance → Corporate and Governance**."],
+    [/vendor|supplier|procurement/,"d27","**Vendor Partnerships** is in **Business and Operations → Vendor and Procurement**."],
+    [/warehouse|lease|propert/,"d21","**Warehouse Leases** are in **Company and Compliance → Legal and Compliance**."],
+    [/audit.?report|statutory.?audit/,"d36","**Audit Reports** are in **Financials → Tax Compliance and Banking → Audit and Compliance**."],
   ];
   for(const [re,id,a] of rules){ if(re.test(ql)) return {answer:a,jumpTo:id}; }
 
   // Greetings
   if(/^(hi|hello|hey|good\s*(morning|afternoon|evening)|howdy)/i.test(ql))
-    return {answer:"Hello! I'm Conditor VDR AI. Ask me where to find a document in this data room, or try the tabs above — **Summarise** reads individual files, **Financial Extract** builds an EBITDA bridge, and **Inconsistencies** flags risks across the room.",jumpTo:null};
+    return {answer:"Hello! I'm Conditor VDR AI. Ask me where to find a document in this data room, or try the tabs above — **Summarise** reads individual files, **Financial Extract** extracts financials into a template, and **Inconsistencies** flags risks across the room.",jumpTo:null};
 
   // Thanks
   if(/^(thanks|thank you|cheers|great|perfect|brilliant)/i.test(ql))
     return {answer:"Happy to help. Let me know if you need anything else from the data room.",jumpTo:null};
 
-  // PE / deal questions with no matching doc
-  if(/valuation|multiple|irr|return|exit|entry|deal|ebitda|pe|private equity|due diligence/i.test(ql))
-    return {answer:"That sounds deal-related. Try **Audited Accounts FY2024** or **Management Accounts** in the sidebar, then use the **Financial Extract** tab to build the EBITDA bridge.",jumpTo:"d7"};
+  // Investment / deal questions with no matching doc
+  if(/valuation|multiple|irr|return|exit|entry|deal|ebitda|series.?a|venture|due diligence/i.test(ql))
+    return {answer:"That sounds deal-related. Try the **Financial Model** in Overview or **Latest Monthly Financials** in the sidebar, then use the **Financial Extract** tab to map figures into a template.",jumpTo:"d2"};
 
   return {answer:"I'm not sure where that is in the data room. Try rephrasing, or use the **Navigate & Ask** tab for AI-powered answers to any question.",jumpTo:null};
 }
@@ -1059,7 +1205,8 @@ function navFallback(q){
 // ============================================================
 function bootDemo(){
   state.source="demo"; state.search=""; state.selectedDoc=null; state.aiResults={}; state.contentCache={}; state.liveFlags=null; state.chat=[];
-  state.expanded={root:true,f1:true,f2:true,f3:false,f4:false,f5:false,f6:false};
+  state.selectedTemplate="tpl_pnl_india"; state.customTemplates=[]; state.showUploadModal=false; state.uploadPreview=null;
+  state.expanded={root:true,f1:true,f2:false,f2a:false,f2b:false,f3:false,f3a:false,f3b:false,f3b1:false,f3b2:false,f3c:false,f3c1:false,f3c2:false,f4:true,f4a:false,f4b:false,f4c:false,f4c1:false,f4c2:false,f4d:false,f5:false,f5a:false,f5b:false,f6:false};
   buildIndex(JSON.parse(JSON.stringify(TREE)));
   state.tab="overview"; render();
 }
@@ -1077,7 +1224,7 @@ const TOUR_STEPS = [
   },
   {
     title: "Your Data Room",
-    body: "The left panel shows the full document tree for the deal room. In demo mode you're exploring Project Meridian — a fictional B2B facilities management deal. Connect Google Drive to load a real deal.",
+    body: "The left panel shows the full document tree for the deal room. In demo mode you're exploring BharatKart Commerce — a fictional Indian D2C e-commerce startup under Series A diligence. Connect Google Drive to load a real deal.",
     anchor: ".side", pos: "right",
   },
   {
@@ -1102,7 +1249,7 @@ const TOUR_STEPS = [
   },
   {
     title: "Financial Data Extraction",
-    body: "Automatically extract and standardise financial data into Conditor's preferred format — including EBITDA adjustments, add-backs, and management account restructuring.",
+    body: "Extract financial data into a chosen template — pick from 5 pre-built templates (P&L, EBITDA bridge, unit economics, cash flow, revenue analytics) or upload your own CSV/JSON template.",
     anchor: ".tabs .tab:nth-child(4)", pos: "bottom",
   },
   {
