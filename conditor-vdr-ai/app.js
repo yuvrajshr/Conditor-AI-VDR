@@ -320,10 +320,7 @@ function topbar(){
   return `<div class="topbar">
     <div class="brand">
       <div class="mark">${markSVG()}</div>
-      <div>
-        <div class="name">Conditor<b>·</b>Capital</div>
-        <div class="tag">VDR Intelligence</div>
-      </div>
+      <div class="tag" style="font-size:9.5px;letter-spacing:.28em;text-transform:uppercase;color:#9db4a8;font-weight:600">VDR Intelligence</div>
     </div>
     <div class="tb-right">
       <div class="provider"><span class="d"></span>${CONFIG.AI_PROVIDER_LABEL} · AI Engine</div>
@@ -335,10 +332,14 @@ function topbar(){
   </div>`;
 }
 function markSVG(){
-  return `<svg viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="1" y="1" width="32" height="32" rx="6" fill="#0c241d" stroke="#c2a14d" stroke-width="1.2"/>
-    <path d="M11 22c-2.2 0-4-2.2-4-5s1.8-5 4-5c1.3 0 2.4.7 3.1 1.8" stroke="#d4b76a" stroke-width="2" stroke-linecap="round"/>
-    <path d="M17 11v11M17 11c2.8 0 5 2.4 5 5.5S19.8 22 17 22" stroke="#eef3ef" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  return `<svg viewBox="0 0 130 74" xmlns="http://www.w3.org/2000/svg">
+    <rect width="130" height="74" rx="7" fill="#ffffff"/>
+    <line x1="10" y1="16" x2="47" y2="16" stroke="#2d4a42" stroke-width="0.8"/>
+    <text x="65" y="20" text-anchor="middle" font-family="Georgia,serif" font-size="8.5" fill="#2d4a42" letter-spacing="3.5">THE</text>
+    <line x1="83" y1="16" x2="120" y2="16" stroke="#2d4a42" stroke-width="0.8"/>
+    <text x="65" y="47" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="25" fill="#2d4a42">Conditor</text>
+    <line x1="36" y1="53" x2="94" y2="53" stroke="#2d4a42" stroke-width="0.8"/>
+    <text x="65" y="64" text-anchor="middle" font-family="Georgia,serif" font-size="9" fill="#2d4a42" letter-spacing="3">Capital</text>
   </svg>`;
 }
 
