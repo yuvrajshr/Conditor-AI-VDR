@@ -610,9 +610,7 @@ async function doNav(){
   const cat=Object.values(state.docIndex).filter(d=>d.type==="doc").map(d=>`• [${d.id}] ${nodePath(d.id)}`).join("\n");
   const history=state.chat.slice(-6).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
 
-  const sys=`You are Conditor VDR AI, an intelligent assistant for Conditor Capital, a UK private equity firm. You have two roles:
-1. Answer ANY question the user asks — general knowledge, finance, PE, anything.
-2. Help navigate a data room by pointing users to specific documents.
+  const sys=`You are Conditor VDR AI, a helpful and knowledgeable AI assistant. You answer ANY question the user asks — general knowledge, finance, markets, PE concepts, company information, or anything else. You also help navigate a data room when relevant.
 
 Available data room documents:
 ${cat||"(none loaded)"}
@@ -621,6 +619,8 @@ Recent conversation:
 ${history}
 
 Instructions:
+- ALWAYS answer the question directly. Never say you can only help with data room questions or redirect the user away from their question.
+- For general questions (finance, stocks, markets, news, concepts, etc.) — answer from your training knowledge. If you lack real-time data (e.g. live stock prices), briefly acknowledge that and then share what you do know on the topic.
 - Answer naturally and helpfully in British English.
 - If your answer relates to a specific document from the list above, add a final line: DOC:[id]  (e.g. DOC:d7)
 - If no specific document is relevant, do not add a DOC line.
