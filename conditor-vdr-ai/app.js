@@ -360,7 +360,6 @@ function topbar(){
       <div class="tag">VDR Intelligence</div>
     </div>
     <div class="tb-right">
-      <div class="provider"><span class="d"></span>${CONFIG.AI_PROVIDER_LABEL} · AI Engine</div>
       <button class="tour-launch" onclick="startTour()">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="11" x2="8" y2="7.5"/><circle cx="8" cy="5.5" r=".5" fill="currentColor" stroke="none"/></svg>
         Tour
@@ -527,16 +526,16 @@ function viewOverview(){
   const folders=(state.tree&&state.tree.children)?state.tree.children.filter(c=>c.type==="folder").length:0;
   const statBlock = isDemo ? `
     <div class="stats">
-      <div class="stat"><div class="k">Documents</div><div class="v">${total}</div><div class="d">across ${folders} workstreams</div></div>
-      <div class="stat"><div class="k">Open Flags</div><div class="v red">${DEMO_FLAGS.length}</div><div class="d">inconsistencies</div></div>
-      <div class="stat"><div class="k">Checklist</div><div class="v amber">2</div><div class="d">items outstanding</div></div>
-      <div class="stat"><div class="k">Jurisdiction</div><div class="v sm">${DEAL.jurisdiction}</div><div class="d">FRS 102</div></div>
+      <div class="stat t-gold"><div class="k">Documents</div><div class="v">${total}</div><div class="d">across ${folders} workstreams</div></div>
+      <div class="stat t-red"><div class="k">Open Flags</div><div class="v red">${DEMO_FLAGS.length}</div><div class="d">inconsistencies</div></div>
+      <div class="stat t-amber"><div class="k">Checklist</div><div class="v amber">2</div><div class="d">items outstanding</div></div>
+      <div class="stat t-green"><div class="k">Jurisdiction</div><div class="v sm">${DEAL.jurisdiction}</div><div class="d">FRS 102</div></div>
     </div>` : `
     <div class="stats">
-      <div class="stat"><div class="k">Top-level items</div><div class="v">${(state.tree&&state.tree.children)?state.tree.children.length:'…'}</div><div class="d">in this folder</div></div>
-      <div class="stat"><div class="k">Folders</div><div class="v">${folders}</div><div class="d">workstreams</div></div>
-      <div class="stat"><div class="k">Source</div><div class="v sm green">Google Drive</div><div class="d">live, read-only</div></div>
-      <div class="stat"><div class="k">AI engine</div><div class="v sm">${CONFIG.AI_PROVIDER_LABEL}</div><div class="d">via backend</div></div>
+      <div class="stat t-gold"><div class="k">Top-level items</div><div class="v">${(state.tree&&state.tree.children)?state.tree.children.length:'…'}</div><div class="d">in this folder</div></div>
+      <div class="stat t-green"><div class="k">Folders</div><div class="v">${folders}</div><div class="d">workstreams</div></div>
+      <div class="stat t-green"><div class="k">Source</div><div class="v sm green">Google Drive</div><div class="d">live, read-only</div></div>
+      <div class="stat t-blue"><div class="k">AI engine</div><div class="v sm">${CONFIG.AI_PROVIDER_LABEL}</div><div class="d">via backend</div></div>
     </div>`;
   return `<div>
     <div class="page-h">
@@ -548,10 +547,10 @@ function viewOverview(){
     </div>
     ${statBlock}
     <div class="card">
-      <h3><span class="num">AI</span> Hierarchy summary — what's where</h3>
+      <h3><span class="card-badge ai">AI</span> Hierarchy summary — what's where</h3>
       <p style="color:var(--muted);font-size:13px">A short orientation to each part of the room, generated from its structure.</p>
       <div id="ovOut">${state.aiResults.overview?`<div class="ai-out">${state.aiResults.overview}</div>`:''}</div>
-      <div class="btn-row" style="margin-top:14px">
+      <div class="btn-row mt-14">
         <button class="btn gold" id="ovGen">${I.spark} Generate room summary</button>
         <button class="btn ghost" onclick="setTab('navigate')">${I.compass} Find a document</button>
       </div>
@@ -698,17 +697,18 @@ Instructions:
 function viewSummarise(){
   const id=state.selectedDoc;
   if(!id||!state.docIndex[id]||state.docIndex[id].type!=="doc")
-    return emptyState(I.doc,"Select a document","Pick a file from the data room on the left, or use Navigate to find one.");
+    return emptyState(I.doc,"Select a document","Click any file in the left panel to open it here, or use Navigate &amp; Ask to find one.");
   const d=state.docIndex[id];
   const cached=state.aiResults["sum_"+id];
+  const metaChips=[nodePath(id),d.size,d.modified?'Modified '+d.modified:null].filter(Boolean).map(m=>`<span class="chip-sm">${escapeHtml(m)}</span>`).join("");
   return `<div>
     <div class="page-h"><div class="eyebrow">${I.doc} Document Summary</div>
       <h2>${escapeHtml(d.name.replace(/\.(pdf|xlsx|docx|csv)$/,""))}</h2>
-      <p>${escapeHtml(nodePath(id))}${d.size?' · '+d.size:''}${d.modified?' · modified '+d.modified:''}</p></div>
+      <div class="doc-meta">${metaChips}</div></div>
     <div class="card">
       <div class="doc-bar"><span class="ic">${docIcon(d)}</span><span class="fname">${escapeHtml(d.name)}</span></div>
       <div id="docPreview"></div>
-      <div class="btn-row" style="margin-top:14px">
+      <div class="btn-row mt-14">
         <button class="btn gold" id="sumGen">${I.spark} Summarise this document</button>
         ${(state.source==="demo"&&FLAGGED_DEMO.has(id))?`<button class="btn ghost" onclick="setTab('flags')">${I.flag} Related flags</button>`:""}
       </div>
@@ -757,15 +757,18 @@ function viewExtract(){
     <div class="page-h"><div class="eyebrow">${I.calc} Financial Template Extraction</div>
       <h2>Reformat to Conditor's EBITDA template</h2>
       <p>Statutory accounts rarely show EBITDA directly — it's derived. Pick a source document and the AI maps the figures into Conditor's internal Adjusted EBITDA bridge.</p></div>
-    <div class="card"><h3><span class="num">1</span> Source financial document</h3>
+    <div class="card"><h3><span class="card-badge">01</span> Source financial document</h3>
       ${cands.length?`<div class="tmpl-list">${cands.slice(0,8).map(c=>`<div class="tmpl-opt ${cur===c.id?'sel':''}" data-fin="${c.id}">
         <div class="ti">${docIcon(c)}</div><div class="tt"><b>${escapeHtml(c.name.replace(/\.(pdf|xlsx|csv|docx)$/,''))}</b><span>${escapeHtml(nodePath(c.id))}</span></div>
-        ${cur===c.id?`<span class="mono" style="color:var(--gold-dim);font-size:11px;font-weight:600">SELECTED</span>`:""}</div>`).join("")}</div>`
+        ${cur===c.id?`<span class="card-badge" style="color:var(--gold-dim)">Selected</span>`:""}</div>`).join("")}</div>`
         :`<div class="note">${I.info}<div>No obvious financial files detected in this room. Open any document with figures and it can still be extracted.</div></div>`}
     </div>
-    <div class="card"><h3><span class="num">2</span> Conditor Adjusted EBITDA template</h3>
-      <div class="mono" style="font-size:11.5px;color:var(--muted);background:var(--card2);border:1px solid var(--line);border-radius:7px;padding:12px">${EBITDA_TEMPLATE_FIELDS.map(f=>"• "+f).join("<br>")}</div>
-      <div class="btn-row" style="margin-top:14px"><button class="btn gold" id="extGen" ${cur?'':'disabled'}>${I.spark} Extract & fill template</button></div>
+    <div class="card"><h3><span class="card-badge">02</span> Conditor Adjusted EBITDA template</h3>
+      <div class="tmpl-preview">${EBITDA_TEMPLATE_FIELDS.map(f=>{
+        const isAdd=/add back/i.test(f), isTotal=/adjusted ebitda|reported ebitda/i.test(f);
+        return `<div class="tp-row${isAdd?' tp-add':''}${isTotal?' tp-total':''}"><span class="tp-dot"></span><span>${escapeHtml(f)}</span></div>`;
+      }).join("")}</div>
+      <div class="btn-row mt-14"><button class="btn gold" id="extGen" ${cur?'':'disabled'}>${I.spark} Extract &amp; fill template</button></div>
       <div id="extOut">${cached||""}</div>
     </div></div>`;
 }
@@ -783,7 +786,7 @@ function bindExtract(){
     if(r.text) html=renderFinTable(r.text)+srcLine(true);
     else if(state.source==="demo") html=FALLBACK.extract(id)+srcLine(false);
     else html=`<div class="err">AI backend error: ${r.error}.</div>`;
-    if(r.text||state.source==="demo") state.aiResults["ext_"+id]=`<div class="ai-out" style="border-left-color:var(--green)">${html}<div class="btn-row" style="margin-top:14px"><button class="btn ghost" onclick="toast('Export to Excel — available when deployed')">${I.download} Export to Excel</button></div></div>`;
+    if(r.text||state.source==="demo") state.aiResults["ext_"+id]=`<div class="ai-out" style="border-left-color:var(--green)">${html}<div class="btn-row mt-14"><button class="btn ghost" onclick="toast('Export to Excel — available when deployed')">${I.download} Export to Excel</button></div></div>`;
     out.innerHTML=state.aiResults["ext_"+id]||`<div class="ai-out">${html}</div>`; b.disabled=false;
   };
 }
@@ -831,21 +834,22 @@ function flagsDemoView(){
   return `<div>
     <div class="page-h"><div class="eyebrow">${I.flag} Inconsistencies & Risk Flags</div>
       <h2>What doesn't add up</h2><p>Automated cross-document review of the data room. Flags are ranked by severity and link to source files.</p></div>
-    <div class="stats" style="grid-template-columns:repeat(3,1fr)">
-      <div class="stat"><div class="k">High severity</div><div class="v red">${c.high}</div><div class="d">deal-impacting</div></div>
-      <div class="stat"><div class="k">Medium</div><div class="v amber">${c.med}</div><div class="d">diligence required</div></div>
-      <div class="stat"><div class="k">Low / quality</div><div class="v" style="color:var(--blue)">${c.low}</div><div class="d">noting items</div></div></div>
-    <div class="card"><div class="btn-row" style="margin-bottom:14px">
+    <div class="stats cols-3">
+      <div class="stat t-red"><div class="k">High severity</div><div class="v red">${c.high}</div><div class="d">deal-impacting</div></div>
+      <div class="stat t-amber"><div class="k">Medium</div><div class="v amber">${c.med}</div><div class="d">diligence required</div></div>
+      <div class="stat t-blue"><div class="k">Low / quality</div><div class="v" style="color:var(--blue)">${c.low}</div><div class="d">noting items</div></div></div>
+    <div class="card"><div class="btn-row mb-14">
       <button class="btn gold" id="flagGen">${I.spark} AI narrative for IC paper</button>
       <button class="btn ghost" onclick="toast('Export — available when deployed')">${I.download} Export red-flag report</button></div>
       <div id="flagNarr">${state.aiResults.flagNarr?`<div class="ai-out">${state.aiResults.flagNarr}</div>`:''}</div></div>
     ${DEMO_FLAGS.map(f=>flagCard(f)).join("")}</div>`;
 }
 function flagCard(f){
+  const jumps=(f.docs||[]).filter(d=>state.docIndex[d]).map(d=>`<button class="jump" onclick="openDoc('${d}')">${I.jump} ${escapeHtml(state.docIndex[d].name)}</button>`).join("");
   return `<div class="flag ${f.sev}"><span class="sev">${f.sev==="high"?"HIGH":f.sev==="med"?"MED":"LOW"}</span>
     <div class="ftxt"><b>${escapeHtml(f.title)}</b><span>${escapeHtml(f.body)}</span>
     ${f.loc?`<span class="floc">${escapeHtml(f.loc)}</span>`:""}
-    ${(f.docs||[]).filter(d=>state.docIndex[d]).map(d=>`<button class="jump" style="margin-right:6px" onclick="openDoc('${d}')">${I.jump} ${escapeHtml(state.docIndex[d].name)}</button>`).join("")}</div></div>`;
+    ${jumps?`<div class="flag-actions">${jumps}</div>`:""}</div></div>`;
 }
 function flagsLiveView(){
   return `<div>
@@ -886,9 +890,9 @@ function viewReconcile(){
     <div class="page-h"><div class="eyebrow">${I.scale} Document Request Reconciliation</div>
       <h2>Checklist vs. what's in the room</h2>
       <p>Compares Conditor's due-diligence request list against the files actually present — surfacing what's missing and what's extra. Edit the list to match your deal.</p></div>
-    <div class="card"><h3><span class="num">1</span> Your request checklist <span style="font-weight:400;color:var(--muted);font-size:12px">(one item per line)</span></h3>
-      <textarea class="checklist-edit" id="checklist">${escapeHtml(defaultChecklist())}</textarea>
-      <div class="btn-row" style="margin-top:12px"><button class="btn gold" id="recRun">${I.spark} Reconcile against the room</button></div>
+    <div class="card"><h3><span class="card-badge">01</span> Your request checklist <span style="font-weight:400;color:var(--muted);font-size:12px">(one item per line)</span></h3>
+      <textarea class="checklist-edit" id="checklist" spellcheck="false" placeholder="Paste your due-diligence request list here, one item per line…">${escapeHtml(defaultChecklist())}</textarea>
+      <div class="btn-row mt-12"><button class="btn gold" id="recRun">${I.spark} Reconcile against the room</button></div>
     </div>
     <div id="recResult"></div></div>`;
 }
@@ -928,15 +932,15 @@ function demoReconcile(items){
 function reconResultHtml(d,live){
   const R=d.received||[],M=d.missing||[],E=d.extra||[];
   return `<div class="card">
-    <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
-      <div class="stat"><div class="k">Received</div><div class="v green">${R.length}</div><div class="d">matched to files</div></div>
-      <div class="stat"><div class="k">Outstanding</div><div class="v red">${M.length}</div><div class="d">to chase the vendor</div></div>
-      <div class="stat"><div class="k">Extra / unrequested</div><div class="v" style="color:var(--blue)">${E.length}</div><div class="d">in room, not on list</div></div></div>
+    <div class="stats cols-3" style="margin-bottom:16px">
+      <div class="stat t-green"><div class="k">Received</div><div class="v green">${R.length}</div><div class="d">matched to files</div></div>
+      <div class="stat t-red"><div class="k">Outstanding</div><div class="v red">${M.length}</div><div class="d">to chase the vendor</div></div>
+      <div class="stat t-blue"><div class="k">Extra / unrequested</div><div class="v" style="color:var(--blue)">${E.length}</div><div class="d">in room, not on list</div></div></div>
     <div class="recon-grid">
       <div class="recon-col ok"><h4>Received <span class="cnt">${R.length}</span></h4>${R.map(x=>`<div class="recon-item">${I.check}<span>${escapeHtml(x.item)}</span></div>`).join("")||'<p style="font-size:12px;color:var(--muted)">None.</p>'}</div>
       <div class="recon-col miss"><h4>Outstanding <span class="cnt">${M.length}</span></h4>${M.map(x=>`<div class="recon-item">${I.miss}<span>${escapeHtml(x)}</span></div>`).join("")||'<p style="font-size:12px;color:var(--muted)">Nothing outstanding.</p>'}</div>
       <div class="recon-col extra"><h4>Extra in room <span class="cnt">${E.length}</span></h4>${E.map(x=>`<div class="recon-item">${I.plus}<span>${escapeHtml(x.replace(/\.(pdf|xlsx|csv|docx)$/,''))}</span></div>`).join("")||'<p style="font-size:12px;color:var(--muted)">None.</p>'}</div></div>
-    <div class="btn-row" style="margin-top:16px"><button class="btn ghost" id="chaserBtn">${I.copy} Draft chaser email for outstanding items</button></div>
+    <div class="btn-row mt-16"><button class="btn ghost" id="chaserBtn">${I.copy} Draft chaser email for outstanding items</button></div>
     <div id="chaserOut"></div>
     ${srcLine(live)}</div>`;
 }
@@ -953,7 +957,7 @@ document.addEventListener("click", async (e)=>{
   const sys=`You are Conditor VDR AI for a UK PE fund. Draft a short professional email (British English) from the Conditor deal team to the vendor's corporate finance adviser, chasing outstanding due-diligence items. Polite, specific, numbered list. Under 160 words. Markdown.`;
   const r=await askAI(sys,`Outstanding items:\n${miss.map(m=>"- "+m).join("\n")}`,{maxTokens:600});
   const html=r.text?mdToHtml(r.text)+srcLine(true):mdToHtml(FALLBACK.chaser(miss))+srcLine(false);
-  out.innerHTML=`<div class="ai-out" style="margin-top:14px">${html}<div class="btn-row" style="margin-top:12px"><button class="btn ghost" onclick="toast('Copied (demo)')">${I.copy} Copy email</button></div></div>`;
+  out.innerHTML=`<div class="ai-out" style="margin-top:14px">${html}<div class="btn-row mt-12"><button class="btn ghost" onclick="toast('Copied (demo)')">${I.copy} Copy email</button></div></div>`;
   btn.disabled=false;
 });
 

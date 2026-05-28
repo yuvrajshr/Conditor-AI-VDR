@@ -7,7 +7,7 @@
 
 const DEAL = {
   fund: "Conditor Capital LLP",
-  target: "Meridian Facilities Group Ltd",
+  target: "Meridian Pvt. Ltd.",
   companiesHouseNo: "08842197",
   sector: "B2B Facilities Management (UK)",
   jurisdiction: "England & Wales",
@@ -19,7 +19,7 @@ const DEAL = {
 // type: folder | doc ; docType drives icon + summariser behaviour
 const TREE = {
   id: "root",
-  name: "Project Meridian — Data Room",
+  name: "Meridian Pvt. Ltd. — Data Room",
   type: "folder",
   children: [
     {
