@@ -11,7 +11,7 @@ const CONFIG = {
   GOOGLE_CLIENT_ID: (typeof window !== "undefined" && window.CONDITOR_CLIENT_ID) || "233514743688-mmdflh9g85mnbsf7ebc3j0ptc67c4ukk.apps.googleusercontent.com",
   // Paste your Gemini API key here for direct browser-side AI (free at aistudio.google.com).
   // Used as fallback when the /api/ai backend is unavailable (e.g. running with node server.js).
-  GEMINI_API_KEY: (typeof window !== "undefined" && window.CONDITOR_GEMINI_KEY) || "AIzaSyBsLWRNh4hMgWRkGnNhR1qyFLOCRMWrJlo",
+  GEMINI_API_KEY: (typeof window !== "undefined" && window.CONDITOR_GEMINI_KEY) || "AIzaSyCwCJKRwytsHueCQqF-h2F_yx5MClqQCc8",
   DRIVE_SCOPE: "https://www.googleapis.com/auth/drive.readonly",
   AI_ENDPOINT: "/api/ai",
   AI_PROVIDER_LABEL: "Gemini",
@@ -626,8 +626,16 @@ Instructions:
 - If no specific document is relevant, do not add a DOC line.
 - Do NOT use any other special formatting — just reply naturally.`;
 
-  // Try direct Gemini first (works without backend), then fall back to backend
-  let r = await askGeminDirect(sys, q, {maxTokens:600});
+  // Call /api/chat (server proxies to Gemini — no CORS issues)
+  const fullPrompt = sys + "\n\nUser: " + q;
+  let r = await fetch("/api/chat", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ prompt: fullPrompt, maxTokens: 600, apiKey: CONFIG.GEMINI_API_KEY })
+  }).then(async res => { const d=await res.json().catch(()=>({})); return res.ok&&d.text ? {text:d.text,live:true} : {error:d.error||"Server error"}; })
+    .catch(e => ({error:e.message}));
+  // Fallback: direct browser call
+  if(!r.text && CONFIG.GEMINI_API_KEY) r = await askGeminDirect(sys, q, {maxTokens:600});
+  // Fallback: /api/ai backend
   if(!r.text) r = await askAI(sys, q, {maxTokens:600});
 
   let answer=null, jumpTo=null;
