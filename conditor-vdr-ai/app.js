@@ -675,9 +675,11 @@ function bindOverview(){
   const b=document.getElementById("ovGen"); if(!b) return;
   b.onclick=async ()=>{
     const out=document.getElementById("ovOut"); out.innerHTML=spinner("Mapping the data room…"); b.disabled=true;
-    const sys=`You are Conditor VDR AI, an assistant for Conditor Capital, a London growth-capital private equity firm (sectors: business services, financial services, healthcare, tech-enabled services). Use British English and PE terminology. Output concise markdown: one bolded folder name then a one-sentence note on what's there and what to prioritise. Under 220 words.`;
+    const topFolders=(state.tree&&state.tree.children||[]).filter(c=>c.type==="folder").map(c=>c.name);
+    const folderList=topFolders.length?`\n\nYou MUST include a bolded entry for every one of these top-level folders (do not skip any):\n${topFolders.map(n=>`- ${n}`).join("\n")}`:"";
+    const sys=`You are Conditor VDR AI, an assistant for Conditor Capital, a London growth-capital private equity firm (sectors: business services, financial services, healthcare, tech-enabled services). Use British English and PE terminology. Output concise markdown: for each top-level folder write one bolded folder name followed by a one-sentence note on what's there and what to prioritise. Cover every folder listed — do not omit any. Under 450 words.${folderList}`;
     const usr=`Folder tree of a data room${state.source==='demo'?` for the acquisition of ${DEAL.target} (${DEAL.sector})`:''}:\n\n${treeText(state.tree,0)}`;
-    const r=await askAI(sys,usr,{maxTokens:700});
+    const r=await askAI(sys,usr,{maxTokens:1100});
     let html;
     if(r.text) html=mdToHtml(r.text)+srcLine(true);
     else if(state.source==="demo") html=mdToHtml(FALLBACK.overview)+srcLine(false);
